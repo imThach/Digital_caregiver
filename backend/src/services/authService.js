@@ -45,9 +45,20 @@ export const loginOrRegisterGoogleUser = async (code) => {
         throw new AppError('Không thể lấy thông tin email từ hồ sơ Google.', 400);
     }
 
-    const { sub: googleId, email, name: fullName, picture: avatarUrl } = userInfo;
+    if (userInfo.email_verified === false) {
+        throw new AppError('Your Google email is not verified.', 401);
+    }
+
+    const {
+        sub: googleId,
+        email: rawEmail,
+        name: fullName,
+        picture: avatarUrl,
+    } = userInfo;
+    const email = rawEmail.trim().toLowerCase();
 
     let user = await User.findOne({ googleId });
+    let isNewUser = false;
 
     if (!user) {
         user = await User.findOne({ email });
@@ -63,14 +74,30 @@ export const loginOrRegisterGoogleUser = async (code) => {
                 fullName: fullName || email.split('@')[0],
                 avatarUrl,
             });
+            isNewUser = true;
         }
     }
 
-    return signToken(user._id);
+    const token = signToken(user._id);
+
+    return {
+        token,
+        isNewUser,
+        authProvider: 'google',
+        user: {
+            id: user._id,
+            email: user.email,
+            fullName: user.fullName,
+            role: user.role,
+            avatarUrl: user.avatarUrl,
+        },
+    };
 };
 
 export const generateAndSendOtp = async (email) => {
     const cleanEmail = email.trim().toLowerCase();
+
+    const userExists = (await User.findOne({ email: cleanEmail })) !== null;
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -82,7 +109,7 @@ export const generateAndSendOtp = async (email) => {
 
     await sendOtpEmail(cleanEmail, otp);
 
-    return true;
+    return { userExists };
 };
 
 export const verifyOtpAndLogin = async (email, otp) => {
@@ -98,6 +125,7 @@ export const verifyOtpAndLogin = async (email, otp) => {
     await Otp.deleteOne({ _id: otpRecord._id });
 
     let user = await User.findOne({ email: cleanEmail });
+    let isNewUser = false;
 
     if (!user) {
         user = await User.create({
@@ -105,12 +133,15 @@ export const verifyOtpAndLogin = async (email, otp) => {
             email: cleanEmail,
             fullName: cleanEmail.split('@')[0],
         });
+        isNewUser = true;
     }
 
     const token = signToken(user._id);
 
     return {
         token,
+        isNewUser,
+        authProvider: 'email_otp',
         user: {
             id: user._id,
             email: user.email,

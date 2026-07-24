@@ -1,6 +1,7 @@
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/appError.js';
 import * as pairingService from '../services/pairingService.js';
+import { setAuthCookie } from '../utils/authCookie.js';
 
 export const generateCode = catchAsync(async (req, res, next) => {
     const data = await pairingService.generatePairingCode(req.user._id);
@@ -20,6 +21,7 @@ export const connectDevice = catchAsync(async (req, res, next) => {
     }
 
     const data = await pairingService.connectDeviceWithCode(pairingCode, nickname, req.user);
+    setAuthCookie(res, data.token);
 
     res.status(200).json({
         status: 'success',

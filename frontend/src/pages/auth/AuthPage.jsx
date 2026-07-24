@@ -56,7 +56,7 @@ function ArrowLeftIcon() {
 function AuthPage() {
   const navigate = useNavigate()
   const [view, setView] = useState('caregiver')
-  
+
   // States for Elderly Pairing Code
   const [pairingCode, setPairingCode] = useState(Array(CODE_LENGTH).fill(''))
   const elderlyRefs = useRef([])
@@ -66,11 +66,12 @@ function AuthPage() {
   const [email, setEmail] = useState('')
   const [otpCode, setOtpCode] = useState(Array(CODE_LENGTH).fill(''))
   const otpRefs = useRef([])
-  
+
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [countdown, setCountdown] = useState(0)
+  const [isExistingUser, setIsExistingUser] = useState(false)
 
   const showElderly = view === 'elderly'
   const hiddenPanel = 'pointer-events-none invisible translate-y-3 scale-[0.98] opacity-0'
@@ -164,10 +165,11 @@ function AuthPage() {
 
     setIsLoading(true)
     try {
-      await authApi.sendOtp(email.trim())
+      const res = await authApi.sendOtp(email.trim())
+      setIsExistingUser(res.data?.userExists || false)
       setAuthStep('otp')
       setCountdown(60)
-      setOtpCode(Array(CODE_LENGTH).fill(''))
+      // setOtpCode(Array(CODE_LENGTH).fill('')) // Không cần reset ở đây, để người dùng thấy mã đã nhập nếu quay lại
       setSuccessMessage('Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư!')
     } catch (err) {
       setErrorMessage(err.message)
@@ -341,11 +343,11 @@ function AuthPage() {
                   required
                 />
                 <button
-                  className="mt-1 flex h-14 w-full items-center justify-center rounded-xl bg-[#176c3a] font-extrabold text-white shadow-[0_18px_32px_rgba(23,108,58,0.22)] transition hover:-translate-y-px hover:bg-[#0d522a] disabled:opacity-60 cursor-pointer"
+                  className="mt-1 flex h-14 w-full items-center justify-center rounded-xl bg-[#176c3a] font-bold text-white shadow-[0_18px_32px_rgba(23,108,58,0.22)] transition hover:-translate-y-px hover:bg-[#0d522a] disabled:opacity-60 cursor-pointer"
                   type="submit"
                   disabled={isLoading}
                 >
-                  {isLoading ? 'Sending OTP...' : 'Send OTP code'}
+                  {isLoading ? 'Sending OTP...' : 'Login'}
                 </button>
               </form>
             ) : (
@@ -390,7 +392,7 @@ function AuthPage() {
                   type="submit"
                   disabled={isLoading}
                 >
-                  {isLoading ? 'Verifying...' : 'Verify & Sign in'}
+                  {isLoading ? 'Verifying...' : isExistingUser ? 'Verify & Signin' : 'Verify & Signup'}
                 </button>
 
                 <div className="text-center mt-1">

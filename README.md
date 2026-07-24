@@ -24,8 +24,7 @@ Digital Caregiver là ứng dụng hỗ trợ người cao tuổi uống thuốc
 - JWT + Google OAuth
 - Gemini API
 - Cloudinary
-- Firebase Cloud Messaging
-- Resend Email
+- Nodemailer
 
 ## Chức năng nổi bật
 

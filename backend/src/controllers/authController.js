@@ -1,6 +1,7 @@
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/appError.js';
 import * as authService from '../services/authService.js';
+import { setAuthCookie } from '../utils/authCookie.js';
 
 export const redirectToGoogle = (req, res, next) => {
     const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL || 'http://localhost:3001/api/v1/auth/google/callback';
@@ -28,10 +29,17 @@ export const handleGoogleCallback = catchAsync(async (req, res, next) => {
         return next(new AppError('Đăng nhập Google thất bại. Không tìm thấy mã xác thực.', 401));
     }
 
-    const token = await authService.loginOrRegisterGoogleUser(code);
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const result = await authService.loginOrRegisterGoogleUser(code);
+    setAuthCookie(res, result.token);
 
-    res.redirect(`${clientUrl}/auth/callback?token=${token}`);
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const callbackParams = new URLSearchParams({
+        token: result.token,
+        isNewUser: String(result.isNewUser),
+        authProvider: result.authProvider,
+    });
+
+    res.redirect(`${clientUrl}/auth/callback?${callbackParams.toString()}`);
 });
 
 export const sendOtp = catchAsync(async (req, res, next) => {
@@ -41,11 +49,12 @@ export const sendOtp = catchAsync(async (req, res, next) => {
         return next(new AppError('Vui lòng nhập địa chỉ email.', 400));
     }
 
-    await authService.generateAndSendOtp(email);
+    const { userExists } = await authService.generateAndSendOtp(email);
 
     res.status(200).json({
         status: 'success',
         message: 'Mã OTP đã được gửi đến email của bạn.',
+        data: { userExists },
     });
 });
 
@@ -57,6 +66,7 @@ export const verifyOtp = catchAsync(async (req, res, next) => {
     }
 
     const result = await authService.verifyOtpAndLogin(email, otp);
+    setAuthCookie(res, result.token);
 
     res.status(200).json({
         status: 'success',

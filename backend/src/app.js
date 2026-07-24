@@ -1,6 +1,7 @@
 import express from "express";
 import mongoose from "./configs/database.js";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import AppError from "./utils/appError.js";
 import globalErrorHandler from "./controllers/error.controller.js";
 import { setupSwagger } from "./configs/swagger.js";
@@ -35,6 +36,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(cookieParser());
 
 // Setup Swagger Open API Docs
 setupSwagger(app);
