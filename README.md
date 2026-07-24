@@ -18,12 +18,12 @@ Digital Caregiver là ứng dụng hỗ trợ người cao tuổi uống thuốc
 ### Backend
 
 - Node.js + Express.js
-- PostgreSQL + Prisma ORM
+- MongoDB + Mongoose
 - Redis + BullMQ
 - Socket.IO
 - JWT + Google OAuth
 - Gemini API
-- Multer + Cloudinary
+- Cloudinary
 - Firebase Cloud Messaging
 - Resend Email
 
