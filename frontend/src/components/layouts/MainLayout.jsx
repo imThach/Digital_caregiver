@@ -1,6 +1,6 @@
 import React from 'react'
-import Sidebar from './Sidebar'
-import Header from './Header'
+import Sidebar from './sidebar'
+import Header from './header'
 import CaregiverSosAlertModal from '../common/CaregiverSosAlertModal'
 
 export function MainLayout({
