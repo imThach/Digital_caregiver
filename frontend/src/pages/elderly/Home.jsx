@@ -59,33 +59,54 @@ export function ElderlyHome() {
   const playLocalSynthesis = useCallback((textToSpeak) => {
     if (!('speechSynthesis' in window)) return
 
-    const voices = window.speechSynthesis.getVoices()
-    const viFemaleVoice =
-      voices.find(
-        (v) =>
-          (v.lang?.toLowerCase().includes('vi') ||
-            v.name?.toLowerCase().includes('vietnam') ||
-            v.name?.toLowerCase().includes('tiếng việt')) &&
-          (v.name?.toLowerCase().includes('female') ||
-            v.name?.toLowerCase().includes('nữ') ||
-            v.name?.toLowerCase().includes('hoaimy') ||
-            v.name?.toLowerCase().includes('giao'))
-      ) ||
-      voices.find(
-        (v) =>
-          v.lang?.toLowerCase().includes('vi') ||
-          v.name?.toLowerCase().includes('vietnam') ||
-          v.name?.toLowerCase().includes('tiếng việt')
-      )
+    const getViFemaleVoice = () => {
+      const voices = window.speechSynthesis.getVoices()
+      if (!voices || voices.length === 0) return null
 
-    const utterance = new SpeechSynthesisUtterance(textToSpeak)
-    utterance.lang = 'vi-VN'
-    if (viFemaleVoice) {
-      utterance.voice = viFemaleVoice
+      return (
+        voices.find(
+          (v) =>
+            (v.lang?.toLowerCase().includes('vi') ||
+              v.name?.toLowerCase().includes('vietnam') ||
+              v.name?.toLowerCase().includes('tiếng việt')) &&
+            (v.name?.toLowerCase().includes('female') ||
+              v.name?.toLowerCase().includes('nữ') ||
+              v.name?.toLowerCase().includes('hoaimy') ||
+              v.name?.toLowerCase().includes('linh') ||
+              v.name?.toLowerCase().includes('giao') ||
+              v.name?.toLowerCase().includes('google'))
+        ) ||
+        voices.find(
+          (v) =>
+            v.lang?.toLowerCase().includes('vi') ||
+            v.name?.toLowerCase().includes('vietnam') ||
+            v.name?.toLowerCase().includes('tiếng việt')
+        )
+      )
     }
-    utterance.rate = 0.95
-    utterance.pitch = 1.1
-    window.speechSynthesis.speak(utterance)
+
+    const speakWithVoice = () => {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(textToSpeak)
+      utterance.lang = 'vi-VN'
+
+      const viVoice = getViFemaleVoice()
+      if (viVoice) {
+        utterance.voice = viVoice
+      }
+      utterance.rate = 0.95
+      utterance.pitch = 1.25 // Warm female vocal tone
+      window.speechSynthesis.speak(utterance)
+    }
+
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        speakWithVoice()
+        window.speechSynthesis.onvoiceschanged = null
+      }
+    } else {
+      speakWithVoice()
+    }
   }, [])
 
   // 100% Natural Vietnamese Female TTS Engine via Backend Proxy & Web Speech Fallback
@@ -241,32 +262,37 @@ export function ElderlyHome() {
     const [h] = timeOfDay.split(':').map(Number)
     if (h >= 5 && h <= 10) return 'morning'
     if (h >= 11 && h <= 15) return 'afternoon'
-    return 'evening'
+    if (h >= 16 && h <= 20) return 'evening'
+    return 'night'
   }
 
   const getSlotTitle = (slotKey) => {
     switch (slotKey) {
       case 'morning':
-        return 'Buổi Sáng (5:00 - 10:59)'
+        return 'Buổi Sáng (07:00)'
       case 'afternoon':
-        return 'Buổi Trưa (11:00 - 15:59)'
+        return 'Buổi Trưa (11:00)'
       case 'evening':
-        return 'Buổi Tối (16:00 - 21:00)'
+        return 'Buổi Tối (18:00)'
+      case 'night':
+        return 'Buổi Đêm (21:00)'
       default:
-        return 'Buổi Sáng'
+        return 'Buổi Sáng (07:00)'
     }
   }
 
   const getSlotNameShort = (slotKey) => {
     switch (slotKey) {
       case 'morning':
-        return 'BUỔI SÁNG'
+        return 'BUỔI SÁNG (07:00)'
       case 'afternoon':
-        return 'BUỔI TRƯA'
+        return 'BUỔI TRƯA (11:00)'
       case 'evening':
-        return 'BUỔI TỐI'
+        return 'BUỔI TỐI (18:00)'
+      case 'night':
+        return 'BUỔI ĐÊM (21:00)'
       default:
-        return 'BUỔI SÁNG'
+        return 'BUỔI SÁNG (07:00)'
     }
   }
 
@@ -274,7 +300,8 @@ export function ElderlyHome() {
     const h = new Date().getHours()
     if (h >= 5 && h <= 10) return 'morning'
     if (h >= 11 && h <= 15) return 'afternoon'
-    return 'evening'
+    if (h >= 16 && h <= 20) return 'evening'
+    return 'night'
   }
 
   // Active slot determination

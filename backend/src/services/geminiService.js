@@ -48,7 +48,7 @@ Yêu cầu trả về DUY NHẤT một chuỗi JSON thuần túy theo định d�
     "purpose": "Công dụng chính (ví dụ: Giảm đau, Hạ huyết áp, Kháng sinh)",
     "dosage": "Liều lượng uống mỗi lần (ví dụ: 1 viên/lần)",
     "instructions": "Hướng dẫn chi tiết (ví dụ: Uống sau khi ăn sáng, Trước khi đi ngủ)",
-    "scheduleTimes": ["08:00", "19:00"],
+    "scheduleTimes": ["07:00", "18:00"],
     "totalQuantity": 20,
     "durationDays": 10
   }
@@ -56,10 +56,15 @@ Yêu cầu trả về DUY NHẤT một chuỗi JSON thuần túy theo định d�
 
 Chú ý:
 - Phân tích cẩn thận chữ viết hoặc chữ in trong hình ảnh để lấy đúng tên thuốc, liều lượng, số lần uống, tổng số lượng viên được kê (totalQuantity) và số ngày dùng thuốc (durationDays).
-- Nếu trong đơn ghi "20 viên" hoặc "SL: 30" -> totalQuantity: 20 hoặc 30. Mặc định nếu không ghi là 30.
-- Nếu là thuốc uống 1 lần/ngày vào buổi sáng: "scheduleTimes": ["08:00"]
-- Nếu là thuốc uống 2 lần/ngày (sáng, tối): "scheduleTimes": ["08:00", "19:00"]
-- Nếu là thuốc uống 3 lần/ngày (sáng, trưa, tối): "scheduleTimes": ["08:00", "12:00", "19:00"]
+- Quy đổi giờ uống theo các khung buổi cố định sinh hoạt:
+  + Buổi Sáng: "07:00"
+  + Buổi Trưa: "11:00"
+  + Buổi Tối: "18:00"
+  + Buổi Đêm / Đi ngủ: "21:00"
+- Nếu ghi "uống 1 lần/ngày vào buổi sáng": "scheduleTimes": ["07:00"]
+- Nếu ghi "uống 2 lần/ngày (sáng, tối)": "scheduleTimes": ["07:00", "18:00"]
+- Nếu ghi "uống 3 lần/ngày (sáng, trưa, tối)": "scheduleTimes": ["07:00", "11:00", "18:00"]
+- Nếu ghi "uống trước khi đi ngủ": "scheduleTimes": ["21:00"]
 - Chuỗi JSON trả về phải hợp lệ 100%. Không đính kèm ký tự markdown hay lời giải thích thừa.
 `;
 

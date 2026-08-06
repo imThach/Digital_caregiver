@@ -335,13 +335,15 @@ export function PrescriptionReview() {
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-[#737f90]">Giờ uống</label>
+                      <label className="text-[11px] font-bold text-[#737f90]">Buổi uống (Giờ thông báo)</label>
                       <input
                         type="text"
-                        value={Array.isArray(med.scheduleTimes) ? med.scheduleTimes.join(', ') : '08:00'}
-                        onChange={(e) => handleMedicationChange(index, 'scheduleTimes', e.target.value.split(', '))}
+                        value={Array.isArray(med.scheduleTimes) ? med.scheduleTimes.join(', ') : '07:00'}
+                        onChange={(e) => handleMedicationChange(index, 'scheduleTimes', e.target.value.split(',').map((s) => s.trim()))}
+                        placeholder="07:00 (Sáng), 11:00 (Trưa), 18:00 (Tối)"
                         className="mt-1 w-full rounded-lg border border-[#c2c6d6] bg-white px-3 py-1.5 text-sm text-[#0058be] font-bold"
                       />
+                      <span className="text-[10px] text-[#737f90] block mt-0.5">Mặc định 4 buổi: Sáng (07:00), Trưa (11:00), Tối (18:00), Đêm (21:00)</span>
                     </div>
                     <div>
                       <label className="text-[11px] font-bold text-[#737f90]">Tổng số lượng kê (Số viên/hộp)</label>
