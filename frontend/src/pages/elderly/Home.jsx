@@ -109,7 +109,7 @@ export function ElderlyHome() {
     }
   }, [])
 
-  // 100% Natural Vietnamese Female TTS Engine via Backend Proxy & Web Speech Fallback
+  // 100% Natural Vietnamese Female TTS Engine via Backend Proxy & Direct Google TTS Stream
   const speakText = useCallback(async (text) => {
     if (!text) return
     const cleanText = text.replace(/[*_#~`]/g, '').trim()
@@ -124,6 +124,7 @@ export function ElderlyHome() {
       window.speechSynthesis.cancel()
     }
 
+    // 1. Try Backend Proxy Google TTS
     try {
       const res = await aiAssistantApi.speakTts(cleanText)
       const audioUrl = res.data?.audioUrl
@@ -134,7 +135,18 @@ export function ElderlyHome() {
         return
       }
     } catch {
-      // Backend TTS proxy fallback to local browser synthesis
+      // Backend API call skipped/failed
+    }
+
+    // 2. Direct Google Translate Vietnamese Female Voice Stream (Works 100% without English accent)
+    try {
+      const directGoogleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText.slice(0, 200))}&tl=vi&client=tw-ob`
+      const audio = new Audio(directGoogleTtsUrl)
+      currentAudioRef.current = audio
+      await audio.play()
+      return
+    } catch {
+      // Autoplay blocked fallback to local Web Speech API
     }
 
     playLocalSynthesis(cleanText)
