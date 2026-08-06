@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { clearAuthSession } from '../auth/tokenStorage.js';
+import { clearAuthSession, getAuthToken } from '../auth/tokenStorage.js';
 
 const defaultRenderUrl = 'https://digital-caregiver-0mv1.onrender.com';
 const isProductionDomain = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
@@ -13,6 +13,18 @@ const axiosClient = axios.create({
     },
     withCredentials: true,
 });
+
+// Request Interceptor: Tự động đính kèm Token JWT Bearer cho kết nối cross-domain (Vercel -> Render)
+axiosClient.interceptors.request.use(
+    (config) => {
+        const token = getAuthToken();
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
 
 // Response Interceptor: Tự động bóc tách dữ liệu & Xử lý lỗi 401 Unauthorized
 axiosClient.interceptors.response.use(

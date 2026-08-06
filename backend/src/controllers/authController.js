@@ -35,6 +35,7 @@ export const handleGoogleCallback = catchAsync(async (req, res, next) => {
 
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
     const callbackParams = new URLSearchParams({
+        token: result.token,
         isNewUser: String(result.isNewUser),
         authProvider: result.authProvider,
     });

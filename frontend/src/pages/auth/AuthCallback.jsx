@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/authProvider.jsx';
+import { saveAuthToken } from '../../auth/tokenStorage.js';
 
 const AuthCallback = () => {
     const location = useLocation();
@@ -9,7 +10,12 @@ const AuthCallback = () => {
 
     useEffect(() => {
         const searchParams = new URLSearchParams(location.search);
+        const token = searchParams.get('token');
         const isNewUser = searchParams.get('isNewUser') === 'true';
+
+        if (token) {
+            saveAuthToken(token);
+        }
 
         async function verifySession() {
             const user = await checkAuth();
