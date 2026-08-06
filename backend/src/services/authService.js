@@ -12,7 +12,12 @@ const signToken = (id, role) => {
 };
 
 export const loginOrRegisterGoogleUser = async (code) => {
-    const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL || 'http://localhost:3001/api/v1/auth/google/callback';
+    const isProduction = process.env.NODE_ENV === 'production';
+    const defaultUri = isProduction
+        ? 'https://digital-caregiver-0mv1.onrender.com/api/v1/auth/google/callback'
+        : 'http://localhost:3001/api/v1/auth/google/callback';
+
+    const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL || defaultUri;
 
     const tokenUrl = 'https://oauth2.googleapis.com/token';
     const tokenParams = new URLSearchParams({

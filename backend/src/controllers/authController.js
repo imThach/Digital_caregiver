@@ -5,7 +5,12 @@ import { getFamilyProfileStatus } from '../services/pairingService.js';
 import { setAuthCookie, clearAuthCookie } from '../utils/authCookie.js';
 
 export const redirectToGoogle = (req, res, next) => {
-    const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL || 'http://localhost:3001/api/v1/auth/google/callback';
+    const isProduction = process.env.NODE_ENV === 'production' || (req.get('host') && !req.get('host').includes('localhost'));
+    const defaultUri = isProduction
+        ? 'https://digital-caregiver-0mv1.onrender.com/api/v1/auth/google/callback'
+        : 'http://localhost:3001/api/v1/auth/google/callback';
+
+    const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL || defaultUri;
     const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
     const options = {
         redirect_uri: redirectUri,
