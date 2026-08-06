@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authApi, pairingApi } from '../../api/apiServices.js'
 import { useAuth } from '../../auth/authProvider.jsx'
+import { saveAuthToken } from '../../auth/tokenStorage.js'
 import loginBg from '../../assets/login_bg.png'
 import logo from '../../assets/logo.png'
 
@@ -144,7 +145,13 @@ function AuthPage() {
       if (response.data?.elderly || response.data?.token) {
         const elderlyUser = response.data.elderly || { role: 'elderly' }
         const caregiverName = response.data.caregiver?.fullName || 'Người thân'
-        login(elderlyUser)
+        const token = response.data?.token
+
+        if (token) {
+          saveAuthToken(token)
+        }
+
+        login({ ...elderlyUser, token })
         setSuccessMessage(`⚡ Kết nối tức thì thành công với người thân (${caregiverName})! Đang chuyển đến màn hình chăm sóc...`)
         setTimeout(() => navigate('/elderly-home'), 1200)
       }
@@ -232,7 +239,11 @@ function AuthPage() {
       const res = await authApi.verifyOtp(email.trim(), fullOtp)
 
       if (res.data?.user) {
-        login(res.data.user)
+        const token = res.data?.token
+        if (token) {
+          saveAuthToken(token)
+        }
+        login({ ...res.data.user, token })
         const freshUser = await checkAuth()
         const nextUser = freshUser || res.data.user
 
