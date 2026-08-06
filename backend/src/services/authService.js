@@ -3,9 +3,11 @@ import { User, Otp } from '../models/index.js';
 import AppError from '../utils/appError.js';
 import { sendOtpEmail } from './emailService.js';
 
-const signToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRES_IN || '1d',
+const signToken = (id, role) => {
+    // Thiết bị người cao tuổi sử dụng token vĩnh viễn (10 năm) để không bao giờ bắt nhập lại mã OTP
+    const expiresIn = role === 'elderly' ? '3650d' : (process.env.JWT_EXPIRES_IN || '30d');
+    return jwt.sign({ id, role }, process.env.JWT_SECRET, {
+        expiresIn,
     });
 };
 
@@ -78,7 +80,7 @@ export const loginOrRegisterGoogleUser = async (code) => {
         }
     }
 
-    const token = signToken(user._id);
+    const token = signToken(user._id, user.role);
 
     return {
         token,
@@ -103,7 +105,7 @@ export const generateAndSendOtp = async (email) => {
 
     await Otp.findOneAndUpdate(
         { email: cleanEmail },
-        { otp, createdAt: new Date() },
+        { otp, failedAttempts: 0, createdAt: new Date() },
         { upsert: true, new: true }
     );
 
@@ -118,8 +120,19 @@ export const verifyOtpAndLogin = async (email, otp) => {
 
     const otpRecord = await Otp.findOne({ email: cleanEmail });
 
-    if (!otpRecord || otpRecord.otp !== cleanOtp) {
-        throw new AppError('Mã OTP không chính xác hoặc đã hết hạn.', 400);
+    if (!otpRecord) {
+        throw new AppError('Mã OTP không tồn tại hoặc đã hết hạn. Vui lòng yêu cầu mã mới.', 400);
+    }
+
+    if (otpRecord.otp !== cleanOtp) {
+        otpRecord.failedAttempts = (otpRecord.failedAttempts || 0) + 1;
+        if (otpRecord.failedAttempts >= 5) {
+            await Otp.deleteOne({ _id: otpRecord._id });
+            throw new AppError('Bạn đã nhập sai OTP quá 5 lần. Mã OTP đã bị hủy. Vui lòng yêu cầu mã mới.', 400);
+        } else {
+            await otpRecord.save();
+            throw new AppError(`Mã OTP không chính xác. Bạn còn ${5 - otpRecord.failedAttempts} lần thử.`, 400);
+        }
     }
 
     await Otp.deleteOne({ _id: otpRecord._id });
@@ -136,7 +149,7 @@ export const verifyOtpAndLogin = async (email, otp) => {
         isNewUser = true;
     }
 
-    const token = signToken(user._id);
+    const token = signToken(user._id, user.role);
 
     return {
         token,

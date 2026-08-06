@@ -28,6 +28,11 @@ const caregiverLinkSchema = new Schema(
             trim: true,
             maxlength: 20,
         },
+        relationship: {
+            type: String,
+            trim: true,
+            maxlength: 80,
+        },
         status: {
             type: String,
             enum: ["pending", "active", "revoked"],

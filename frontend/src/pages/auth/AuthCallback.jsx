@@ -1,24 +1,39 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth/authProvider.jsx';
 
 const AuthCallback = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { checkAuth } = useAuth();
 
     useEffect(() => {
-        // Lấy token từ URL query parameter
         const searchParams = new URLSearchParams(location.search);
-        const token = searchParams.get('token');
+        const isNewUser = searchParams.get('isNewUser') === 'true';
 
-        if (token) {
-            // Lưu token vào localStorage (hoặc state manager như Zustand)
-            localStorage.setItem('jwt_token', token);
-            // Chuyển hướng người dùng đến trang dashboard hoặc trang chính
-            navigate('/dashboard');
+        async function verifySession() {
+            const user = await checkAuth();
+            if (user) {
+                if (user.role === 'elderly') {
+                    navigate('/elderly-home', { replace: true });
+                } else if (isNewUser || user.profileStatus?.isComplete === false) {
+                    navigate('/profile', { replace: true });
+                } else {
+                    navigate('/dashboard', { replace: true });
+                }
+            } else {
+                navigate('/login', { replace: true });
+            }
         }
-    }, [location, navigate]);
 
-    return <div>Đang xử lý đăng nhập...</div>;
+        verifySession();
+    }, [location.search, navigate, checkAuth]);
+
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-[#f7f9f5] font-bold text-[#176c3a]">
+            Đang xác minh phiên làm việc và đăng nhập...
+        </div>
+    );
 };
 
 export default AuthCallback;

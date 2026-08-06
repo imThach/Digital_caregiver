@@ -20,13 +20,19 @@ async function startServer() {
         // KHỞI TẠO SOCKET.IO
         const io = new Server(server, {
             cors: {
-                origin: "http://localhost:3000",
+                origin: true,
+                credentials: true,
                 methods: ["GET", "POST"]
             }
         });
 
+        app.set("io", io);
+
         io.on("connection", (socket) => {
             console.log(`🔌 Client kết nối Socket: ${socket.id}`);
+            socket.on("join_room", (room) => {
+                if (room) socket.join(String(room));
+            });
             socket.on("trigger_sos", (data) => {
                 console.log("🚨 Nhận tín hiệu SOS:", data);
                 socket.broadcast.emit("receive_sos", data);

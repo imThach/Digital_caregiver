@@ -101,4 +101,24 @@ router.post('/confirm', restrictTo('caregiver'), prescriptionController.confirmP
  */
 router.get('/elderly/:elderlyId', prescriptionController.getElderlyPrescriptions);
 
+/**
+ * @swagger
+ * /api/v1/prescriptions/{id}:
+ *   delete:
+ *     summary: Xóa đơn thuốc và toàn bộ lịch uống thuốc liên quan
+ *     tags: [Prescriptions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Đã xóa đơn thuốc thành công
+ */
+router.delete('/:id', restrictTo('caregiver'), prescriptionController.deletePrescription);
+
 export default router;

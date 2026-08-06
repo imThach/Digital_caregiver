@@ -39,5 +39,6 @@ router.use(protect);
  *         description: Trả về câu trả lời ngắn gọn (2-3 câu) của Gemini dùng cho TTS
  */
 router.post('/chat', aiAssistantController.askAssistant);
+router.post('/tts', aiAssistantController.generateTts);
 
 export default router;

@@ -19,6 +19,11 @@ const prescriptionSchema = new Schema(
             type: String,
             required: true,
         },
+        title: {
+            type: String,
+            trim: true,
+            default: "Đơn thuốc khám bệnh",
+        },
         rawAiResponse: Schema.Types.Mixed,
         status: {
             type: String,
@@ -27,10 +32,14 @@ const prescriptionSchema = new Schema(
             index: true,
         },
         confirmedAt: Date,
+        createdAt: {
+            type: Date,
+            default: Date.now,
+            expires: 30 * 24 * 60 * 60, // Tự động xóa đơn thuốc sau 30 ngày (2,592,000 giây)
+        },
     },
     {
         collection: "prescriptions",
-        timestamps: { createdAt: true, updatedAt: false },
     },
 );
 

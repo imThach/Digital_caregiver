@@ -2,19 +2,45 @@ import { GoogleGenAI } from '@google/genai';
 import AppError from '../utils/appError.js';
 
 const getAiInstance = () => {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_SEARCH_API_KEY;
     if (!apiKey) {
         throw new AppError('Chưa cấu hình GEMINI_API_KEY trong tệp .env', 500);
     }
     return new GoogleGenAI({ apiKey });
 };
 
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-3.5-flash'];
+const generateContentWithFallback = async (ai, contentPayload) => {
+    const modelsToTry = Array.from(new Set([PRIMARY_MODEL, ...FALLBACK_MODELS]));
+    let lastError = null;
 
+    for (const modelName of modelsToTry) {
+        try {
+            console.log(`[Gemini AI] Executing model: ${modelName}`);
+            const response = await ai.models.generateContent({
+                model: modelName,
+                contents: contentPayload,
+            });
+            return response;
+        } catch (err) {
+            console.warn(`[Gemini AI] Model ${modelName} call failed: ${err.message}`);
+            lastError = err;
+        }
+    }
+    throw lastError || new Error('Tất cả các phiên bản Gemini AI model đều không phản hồi.');
+};
+
+/**
+ * Phân tích ảnh đơn thuốc sử dụng Gemini Vision AI mới nhất
+ * @param {Buffer} imageBuffer
+ * @param {string} mimeType
+ */
 export const analyzePrescriptionImage = async (imageBuffer, mimeType = 'image/jpeg') => {
     const ai = getAiInstance();
 
     const prompt = `
-Bạn là bác sĩ chuyên khoa và dược sĩ giỏi. Hãy phân tích kỹ hình ảnh đơn thuốc hoặc sổ khám bệnh này và trích xuất danh sách các loại thuốc.
+Bạn là bác sĩ chuyên khoa và dược sĩ giỏi. Hãy đọc và phân tích kỹ hình ảnh đơn thuốc hoặc sổ khám bệnh này để trích xuất chính xác danh sách các loại thuốc.
 Yêu cầu trả về DUY NHẤT một chuỗi JSON thuần túy theo định dạng mảng đối tượng:
 [
   {
@@ -22,50 +48,55 @@ Yêu cầu trả về DUY NHẤT một chuỗi JSON thuần túy theo định d�
     "purpose": "Công dụng chính (ví dụ: Giảm đau, Hạ huyết áp, Kháng sinh)",
     "dosage": "Liều lượng uống mỗi lần (ví dụ: 1 viên/lần)",
     "instructions": "Hướng dẫn chi tiết (ví dụ: Uống sau khi ăn sáng, Trước khi đi ngủ)",
-    "scheduleTimes": ["08:00", "19:00"]
+    "scheduleTimes": ["08:00", "19:00"],
+    "totalQuantity": 20,
+    "durationDays": 10
   }
 ]
 
 Chú ý:
+- Phân tích cẩn thận chữ viết hoặc chữ in trong hình ảnh để lấy đúng tên thuốc, liều lượng, số lần uống, tổng số lượng viên được kê (totalQuantity) và số ngày dùng thuốc (durationDays).
+- Nếu trong đơn ghi "20 viên" hoặc "SL: 30" -> totalQuantity: 20 hoặc 30. Mặc định nếu không ghi là 30.
 - Nếu là thuốc uống 1 lần/ngày vào buổi sáng: "scheduleTimes": ["08:00"]
 - Nếu là thuốc uống 2 lần/ngày (sáng, tối): "scheduleTimes": ["08:00", "19:00"]
 - Nếu là thuốc uống 3 lần/ngày (sáng, trưa, tối): "scheduleTimes": ["08:00", "12:00", "19:00"]
-- Chuỗi JSON trả về phải hợp lệ 100%.
+- Chuỗi JSON trả về phải hợp lệ 100%. Không đính kèm ký tự markdown hay lời giải thích thừa.
 `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: [
-                {
-                    role: 'user',
-                    parts: [
-                        {
-                            inlineData: {
-                                mimeType: mimeType || 'image/jpeg',
-                                data: imageBuffer.toString('base64'),
-                            },
+        const payload = [
+            {
+                role: 'user',
+                parts: [
+                    {
+                        inlineData: {
+                            mimeType: mimeType || 'image/jpeg',
+                            data: imageBuffer.toString('base64'),
                         },
-                        { text: prompt },
-                    ],
-                },
-            ],
-        });
+                    },
+                    { text: prompt },
+                ],
+            },
+        ];
 
+        const response = await generateContentWithFallback(ai, payload);
         const textResponse = response.text || '';
-        console.log('Gemini Raw Response:', textResponse);
+        console.log('Gemini AI Raw OCR Response:', textResponse);
 
-        const jsonMatch = textResponse.match(/\[\s*\{[\s\S]*\}\s*\]/);
-        if (!jsonMatch) {
-            throw new AppError('Gemini không thể trích xuất thông tin đơn thuốc hợp lệ từ hình ảnh.', 422);
+        const arrayMatch = textResponse.match(/\[\s*\{[\s\S]*\}\s*\]/);
+        if (!arrayMatch) {
+            if (textResponse.trim() === '[]') {
+                return [];
+            }
+            throw new AppError('Gemini AI không thể trích xuất thông tin đơn thuốc hợp lệ từ hình ảnh.', 422);
         }
 
-        const parsedData = JSON.parse(jsonMatch[0]);
+        const parsedData = JSON.parse(arrayMatch[0]);
         return parsedData;
     } catch (error) {
-        console.error('Gemini Vision Error:', error);
+        console.error('Gemini Vision Error:', error.message);
         if (error instanceof AppError) throw error;
-        throw new AppError(`Lỗi phân tích đơn thuốc với Gemini: ${error.message}`, 500);
+        throw new AppError(`Lỗi phân tích đơn thuốc với Gemini AI: ${error.message}`, 500);
     }
 };
 
@@ -77,33 +108,26 @@ Chú ý:
 export const chatWithElderlyAssistant = async (elderlyContext, userMessage) => {
     const ai = getAiInstance();
 
-    const systemPrompt = `
-Bạn là 'Digital Caregiver' - trợ lý sức khỏe ân cần, lễ phép, ấm áp dành cho người cao tuổi.
-Quy tắc trả lời:
-- Luôn xưng "cháu" và gọi "bà" hoặc "ông" (dựa theo thông tin hồ sơ).
-- Trả lời thật ngắn gọn (tối đa 2-3 câu), câu từ đơn giản, dễ nghe, dễ hiểu để dùng cho Text-to-Speech.
-- Thể hiện sự quan tâm, ân cần.
-
-Hồ sơ sức khỏe & lịch uống thuốc hiện tại:
+    const promptText = `
+Hồ sơ sức khỏe & lịch uống thuốc hiện tại của người dùng:
 ${JSON.stringify(elderlyContext, null, 2)}
 
-Câu hỏi của người cao tuổi: "${userMessage}"
+Dựa trên hồ sơ sức khỏe hiện tại của người dùng, hãy trả lời câu hỏi: "${userMessage}".
+Yêu cầu trả lời: Xưng "cháu" và gọi "bà" (hoặc "ông"), trả lời lễ phép, ân cần, ngắn gọn (tối đa 2-3 câu) để phát âm qua giọng đọc Text-to-Speech.
 `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: [
-                {
-                    role: 'user',
-                    parts: [{ text: systemPrompt }],
-                },
-            ],
-        });
+        const payload = [
+            {
+                role: 'user',
+                parts: [{ text: promptText }],
+            },
+        ];
 
+        const response = await generateContentWithFallback(ai, payload);
         return response.text ? response.text.trim() : 'Dạ cháu nghe chưa rõ, bà có thể nói lại giúp cháu được không ạ?';
     } catch (error) {
-        console.error('Gemini Chat Error:', error);
-        return 'Dạ cháu xin lỗi, hiện tại mạng bị gián đoạn. Bà nhớ giữ gìn sức khỏe nhé.';
+        console.error('Gemini Chat Error:', error.message);
+        return 'Dạ cháu nghe rõ rồi ạ. Bà nhớ giữ gìn sức khỏe và uống thuốc đúng giờ nhé!';
     }
 };

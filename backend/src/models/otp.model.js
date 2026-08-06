@@ -16,6 +16,10 @@ const otpSchema = new Schema(
             required: true,
             trim: true,
         },
+        failedAttempts: {
+            type: Number,
+            default: 0,
+        },
         createdAt: {
             type: Date,
             default: Date.now,

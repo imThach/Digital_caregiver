@@ -1,7 +1,8 @@
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/appError.js';
 import * as authService from '../services/authService.js';
-import { setAuthCookie } from '../utils/authCookie.js';
+import { getFamilyProfileStatus } from '../services/pairingService.js';
+import { setAuthCookie, clearAuthCookie } from '../utils/authCookie.js';
 
 export const redirectToGoogle = (req, res, next) => {
     const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL || 'http://localhost:3001/api/v1/auth/google/callback';
@@ -34,7 +35,6 @@ export const handleGoogleCallback = catchAsync(async (req, res, next) => {
 
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
     const callbackParams = new URLSearchParams({
-        token: result.token,
         isNewUser: String(result.isNewUser),
         authProvider: result.authProvider,
     });
@@ -72,5 +72,27 @@ export const verifyOtp = catchAsync(async (req, res, next) => {
         status: 'success',
         message: 'Đăng nhập thành công.',
         data: result,
+    });
+});
+
+export const getMe = catchAsync(async (req, res, next) => {
+    const profileStatus = req.user.role === 'caregiver'
+        ? await getFamilyProfileStatus(req.user._id)
+        : { isComplete: true, missingFields: [] };
+
+    res.status(200).json({
+        status: 'success',
+        data: {
+            user: req.user,
+            profileStatus,
+        },
+    });
+});
+
+export const logout = catchAsync(async (req, res, next) => {
+    clearAuthCookie(res);
+    res.status(200).json({
+        status: 'success',
+        message: 'Đăng xuất thành công.',
     });
 });

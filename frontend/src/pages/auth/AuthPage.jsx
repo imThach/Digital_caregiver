@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authApi, pairingApi } from '../../api/apiServices.js'
+import { useAuth } from '../../auth/authProvider.jsx'
 import loginBg from '../../assets/login_bg.png'
 import logo from '../../assets/logo.png'
 
@@ -55,6 +56,7 @@ function ArrowLeftIcon() {
 
 function AuthPage() {
   const navigate = useNavigate()
+  const { login, checkAuth } = useAuth()
   const [view, setView] = useState('caregiver')
 
   // States for Elderly Pairing Code
@@ -138,15 +140,16 @@ function AuthPage() {
 
     setIsLoading(true)
     try {
-      const response = await pairingApi.connectDevice(fullCode, 'Ông/Bà')
-      if (response.data?.token) {
-        localStorage.setItem('jwt_token', response.data.token)
-        localStorage.setItem('user_role', 'elderly')
-        setSuccessMessage('Kết nối thiết bị thành công!')
-        setTimeout(() => navigate('/dashboard'), 1000)
+      const response = await pairingApi.connectDevice(fullCode)
+      if (response.data?.elderly || response.data?.token) {
+        const elderlyUser = response.data.elderly || { role: 'elderly' }
+        const caregiverName = response.data.caregiver?.fullName || 'Người thân'
+        login(elderlyUser)
+        setSuccessMessage(`⚡ Kết nối tức thì thành công với người thân (${caregiverName})! Đang chuyển đến màn hình chăm sóc...`)
+        setTimeout(() => navigate('/elderly-home'), 1200)
       }
     } catch (err) {
-      setErrorMessage(err.message)
+      setErrorMessage(err.message || 'Mã kết nối không chính xác hoặc đã hết hạn (hạn 24h).')
     } finally {
       setIsLoading(false)
     }
@@ -228,12 +231,20 @@ function AuthPage() {
     try {
       const res = await authApi.verifyOtp(email.trim(), fullOtp)
 
-      if (res.data?.token) {
-        localStorage.setItem('jwt_token', res.data.token)
-        localStorage.setItem('user_role', res.data.user?.role || 'caregiver')
-        navigate('/dashboard')
+      if (res.data?.user) {
+        login(res.data.user)
+        const freshUser = await checkAuth()
+        const nextUser = freshUser || res.data.user
+
+        if (nextUser.role === 'elderly') {
+          navigate('/elderly-home')
+        } else if (res.data.isNewUser || nextUser.profileStatus?.isComplete === false) {
+          navigate('/profile')
+        } else {
+          navigate('/dashboard')
+        }
       } else {
-        throw new Error('Không nhận được token xác thực.')
+        throw new Error('Đăng nhập thất bại. Không nhận được thông tin tài khoản.')
       }
     } catch (err) {
       setErrorMessage(err.message)

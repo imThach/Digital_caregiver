@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "./configs/database.js";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
 import AppError from "./utils/appError.js";
 import globalErrorHandler from "./controllers/error.controller.js";
 import { setupSwagger } from "./configs/swagger.js";
@@ -15,19 +16,26 @@ import emergencyRouter from "./routes/emergencyRoute.js";
 
 const app = express();
 
+// Security HTTP headers
+app.use(helmet());
+
 // CORS Configuration
 const allowedOrigins = [
-    process.env.CLIENT_URL || "http://localhost:3000",
+    process.env.CLIENT_URL,
     "http://localhost:3000",
     "http://localhost:5173",
-];
+].filter(Boolean);
 
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            callback(null, true); // Cho phép thiết bị local / mobile
+            if (process.env.NODE_ENV === 'production') {
+                callback(new AppError('Origin không nằm trong danh sách cho phép (CORS).', 403));
+            } else {
+                callback(null, true);
+            }
         }
     },
     credentials: true,
@@ -35,7 +43,8 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // Setup Swagger Open API Docs

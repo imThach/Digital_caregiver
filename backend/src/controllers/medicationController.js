@@ -1,9 +1,21 @@
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/appError.js';
 import * as medicationService from '../services/medicationService.js';
+import { CaregiverLink } from '../models/index.js';
 
 export const getTodaySchedules = catchAsync(async (req, res, next) => {
-    const { elderlyId } = req.params;
+    let { elderlyId } = req.params;
+
+    if (!elderlyId || elderlyId === 'undefined' || elderlyId === 'null' || elderlyId === 'demo-elderly-id' || elderlyId === 'my-elderly') {
+        const link = await CaregiverLink.findOne({
+            caregiverId: req.user._id,
+            status: { $in: ['active', 'pending'] },
+        }).sort({ linkedAt: -1, createdAt: -1 });
+
+        if (link) {
+            elderlyId = link.elderlyId;
+        }
+    }
 
     const schedules = await medicationService.getTodaySchedulesService(elderlyId);
 
@@ -14,10 +26,21 @@ export const getTodaySchedules = catchAsync(async (req, res, next) => {
 });
 
 export const logMedicationStatus = catchAsync(async (req, res, next) => {
-    const { elderlyId, scheduleId, status, snoozeMinutes } = req.body;
+    let { elderlyId, scheduleId, status, snoozeMinutes } = req.body;
 
-    if (!elderlyId || !scheduleId || !status) {
-        return next(new AppError('Vui lòng cung cấp elderlyId, scheduleId và status (taken/snoozed).', 400));
+    if (!scheduleId || !status) {
+        return next(new AppError('Vui lòng cung cấp scheduleId và status (taken/snoozed).', 400));
+    }
+
+    if (!elderlyId || elderlyId === 'undefined' || elderlyId === 'null' || elderlyId === 'demo-elderly-id' || elderlyId === 'my-elderly') {
+        const link = await CaregiverLink.findOne({
+            caregiverId: req.user._id,
+            status: { $in: ['active', 'pending'] },
+        }).sort({ linkedAt: -1, createdAt: -1 });
+
+        if (link) {
+            elderlyId = link.elderlyId;
+        }
     }
 
     if (!['taken', 'snoozed'].includes(status)) {

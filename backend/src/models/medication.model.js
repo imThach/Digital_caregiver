@@ -30,7 +30,29 @@ const medicationSchema = new Schema(
             trim: true,
             maxlength: 100,
         },
+        totalQuantity: {
+            type: Number,
+            default: 30,
+        },
+        remainingQuantity: {
+            type: Number,
+            default: 30,
+        },
+        durationDays: {
+            type: Number,
+            default: 15,
+        },
         imageUrl: String,
+        startDate: {
+            type: Date,
+            default: () => {
+                const d = new Date();
+                d.setDate(d.getDate() + 1);
+                d.setHours(0, 0, 0, 0);
+                return d;
+            },
+            index: true,
+        },
         isActive: {
             type: Boolean,
             default: true,

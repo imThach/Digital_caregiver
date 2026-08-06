@@ -20,7 +20,8 @@ export const connectDevice = catchAsync(async (req, res, next) => {
         return next(new AppError('Vui lòng nhập mã kết nối 6 chữ số.', 400));
     }
 
-    const data = await pairingService.connectDeviceWithCode(pairingCode, nickname, req.user);
+    const io = req.app.get('io');
+    const data = await pairingService.connectDeviceWithCode(pairingCode, nickname, req.user, io);
     setAuthCookie(res, data.token);
 
     res.status(200).json({
@@ -39,8 +40,27 @@ export const getMyElderly = catchAsync(async (req, res, next) => {
     });
 });
 
+export const getFamilyProfile = catchAsync(async (req, res, next) => {
+    const data = await pairingService.getFamilyProfileStatus(req.user._id);
+
+    res.status(200).json({
+        status: 'success',
+        data,
+    });
+});
+
+export const updateFamilyProfile = catchAsync(async (req, res, next) => {
+    const data = await pairingService.updateFamilyProfileService(req.user._id, req.body, req.files);
+
+    res.status(200).json({
+        status: 'success',
+        message: 'Đã cập nhật Family Profile thành công.',
+        data,
+    });
+});
+
 export const updateElderlyProfile = catchAsync(async (req, res, next) => {
-    const { elderlyId, nickname, fullName, emergencyPhone, dateOfBirth } = req.body;
+    const { elderlyId, nickname, fullName, emergencyPhone, dateOfBirth, relationship } = req.body;
 
     if (!elderlyId) {
         return next(new AppError('Vui lòng cung cấp elderlyId.', 400));
@@ -51,6 +71,7 @@ export const updateElderlyProfile = catchAsync(async (req, res, next) => {
         fullName,
         emergencyPhone,
         dateOfBirth,
+        relationship,
     });
 
     res.status(200).json({

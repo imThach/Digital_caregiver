@@ -12,20 +12,28 @@ const transporter = nodemailer.createTransport({
 });
 
 export const getTodaySchedulesService = async (elderlyId) => {
-    const activeMedications = await Medication.find({ elderlyId, isActive: true });
-    const medIds = activeMedications.map(m => m._id);
-
-    const schedules = await MedicationSchedule.find({
-        medicationId: { $in: medIds },
-        isActive: true,
-    }).populate('medicationId', 'name usageNote dosage imageUrl');
-
     // Xác định đầu ngày và cuối ngày theo giờ địa phương
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
+
+    // Chỉ lấy các thuốc active đã đến ngày bắt đầu (startDate <= endOfDay)
+    const activeMedications = await Medication.find({
+        elderlyId,
+        isActive: true,
+        $or: [
+            { startDate: { $lte: endOfDay } },
+            { startDate: { $exists: false } },
+        ],
+    });
+    const medIds = activeMedications.map(m => m._id);
+
+    const schedules = await MedicationSchedule.find({
+        medicationId: { $in: medIds },
+        isActive: true,
+    }).populate('medicationId', 'name usageNote dosage imageUrl totalQuantity remainingQuantity durationDays');
 
     const logs = await MedicationLog.find({
         elderlyId,
@@ -45,7 +53,10 @@ export const getTodaySchedulesService = async (elderlyId) => {
             medicationName: sch.medicationId?.name || 'Thuốc',
             usageNote: sch.medicationId?.usageNote || '',
             dosage: sch.medicationId?.dosage || '1 viên',
-            imageUrl: sch.medicationId?.imageUrl || '',
+            totalQuantity: sch.medicationId?.totalQuantity || 30,
+            remainingQuantity: sch.medicationId?.remainingQuantity !== undefined ? sch.medicationId.remainingQuantity : 30,
+            durationDays: sch.medicationId?.durationDays || 15,
+            imageUrl: sch.medicationId?.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(sch.medicationId?.name || 'Thuốc')}&background=0058be&color=fff&size=256`,
             timeOfDay: sch.timeOfDay,
             status: existingLog ? existingLog.status : 'pending',
             respondedAt: existingLog ? existingLog.respondedAt : null,
@@ -90,6 +101,26 @@ export const logMedicationStatusService = async (elderlyId, scheduleId, status, 
     if (status === 'taken') {
         log.respondedAt = now;
         log.snoozeUntil = null;
+
+        // Trừ số lượng thuốc còn lại và tự động hủy lịch nếu hết thuốc
+        if (schedule.medicationId) {
+            const med = await Medication.findById(schedule.medicationId);
+            if (med && med.isActive) {
+                const currentRemaining = med.remainingQuantity !== undefined ? med.remainingQuantity : med.totalQuantity || 30;
+                const newRemaining = Math.max(0, currentRemaining - 1);
+                med.remainingQuantity = newRemaining;
+
+                if (newRemaining <= 0) {
+                    console.log(`[Medication Auto-Delete] Thuốc "${med.name}" của elderly ${elderlyId} đã hết (0 viên remaining). Tự động XÓA KHỎI DATABASE để tối ưu dung lượng.`);
+                    // 1. Xóa vĩnh viễn tất cả lịch uống thuốc liên quan khỏi DB
+                    await MedicationSchedule.deleteMany({ medicationId: med._id });
+                    // 2. Xóa vĩnh viễn thuốc khỏi DB
+                    await Medication.findByIdAndDelete(med._id);
+                } else {
+                    await med.save();
+                }
+            }
+        }
     } else if (status === 'snoozed') {
         log.snoozeUntil = new Date(now.getTime() + snoozeMinutes * 60 * 1000);
     }
@@ -151,6 +182,17 @@ export const checkOverdueMedicationsAndNotify = async () => {
             const [hours, minutes] = sch.timeOfDay.split(':').map(Number);
             const scheduledTime = new Date();
             scheduledTime.setHours(hours, minutes, 0, 0);
+
+            // Bỏ qua phát thông báo quá hạn cho mốc giờ trôi qua trước thời điểm tạo đơn thuốc hôm nay
+            if (sch.medicationId) {
+                const med = await Medication.findById(sch.medicationId);
+                if (med && med.createdAt) {
+                    const createdDate = new Date(med.createdAt);
+                    if (createdDate.toDateString() === now.toDateString() && scheduledTime.getTime() < createdDate.getTime()) {
+                        continue;
+                    }
+                }
+            }
 
             // Kiểm tra nếu đã quá 30 phút so với giờ hẹn
             const diffMinutes = (now.getTime() - scheduledTime.getTime()) / (1000 * 60);

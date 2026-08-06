@@ -89,15 +89,36 @@ const sendEmergencyEmail = async (caregiverEmail, elderlyName, mapsLink, emergen
     }
 };
 
-export const getEmergencyHistoryService = async (caregiverId) => {
+export const getEmergencyHistoryService = async (caregiverId, page = 1, limit = 10) => {
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
     const links = await CaregiverLink.find({ caregiverId, status: 'active' });
     const elderlyIds = links.map(l => l.elderlyId).filter(Boolean);
 
-    const events = await EmergencyEvent.find({ elderlyId: { $in: elderlyIds } })
-        .populate('elderlyId', 'fullName nickname')
-        .sort({ createdAt: -1 });
+    const filter = { elderlyId: { $in: elderlyIds } };
 
-    return events;
+    const total = await EmergencyEvent.countDocuments(filter);
+    const events = await EmergencyEvent.find(filter)
+        .populate('elderlyId', 'fullName nickname')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum);
+
+    const totalPages = Math.ceil(total / limitNum) || 1;
+
+    return {
+        events,
+        pagination: {
+            total,
+            page: pageNum,
+            limit: limitNum,
+            totalPages,
+            hasNextPage: pageNum < totalPages,
+            hasPrevPage: pageNum > 1,
+        },
+    };
 };
 
 export const acknowledgeEmergencyService = async (caregiverId, eventId, status) => {
