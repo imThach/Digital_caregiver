@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import ImageLightboxModal from '../common/ImageLightboxModal'
+import { aiAssistantApi } from '../../api/apiServices'
 
 export function MedicationReminderModal({
   isOpen,
@@ -25,10 +26,17 @@ export function MedicationReminderModal({
       if (speakFn) {
         speakFn(announceText)
       } else {
-        try {
-          const directGoogleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(announceText.slice(0, 200))}&tl=vi&client=tw-ob`
-          const audio = new Audio(directGoogleTtsUrl)
-          audio.play().catch(() => {
+        aiAssistantApi
+          .speakTts(announceText)
+          .then((res) => {
+            if (res.data?.audioUrl) {
+              const audio = new Audio(res.data.audioUrl)
+              audio.play().catch(() => {
+                // Ignore autoplay restrictions
+              })
+            }
+          })
+          .catch(() => {
             if ('speechSynthesis' in window) {
               window.speechSynthesis.cancel()
               const utterance = new SpeechSynthesisUtterance(announceText)
@@ -38,16 +46,6 @@ export function MedicationReminderModal({
               window.speechSynthesis.speak(utterance)
             }
           })
-        } catch {
-          if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel()
-            const utterance = new SpeechSynthesisUtterance(announceText)
-            utterance.lang = 'vi-VN'
-            utterance.rate = 0.95
-            utterance.pitch = 1.25
-            window.speechSynthesis.speak(utterance)
-          }
-        }
       }
     }
   }, [isOpen, medicationName, patientNickname, timeOfDay, isTimeYet, speakFn])

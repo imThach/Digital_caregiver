@@ -16,16 +16,17 @@ export const generateTts = catchAsync(async (req, res, next) => {
     const cleanText = text.replace(/[*_#~`]/g, '').trim();
 
     try {
-        const audioUrl = googleTTS.getAudioUrl(cleanText.slice(0, 300), {
+        const base64Audio = await googleTTS.getAudioBase64(cleanText.slice(0, 300), {
             lang: 'vi',
             slow: false,
             host: 'https://translate.google.com',
+            timeout: 10000,
         });
 
         res.status(200).json({
             status: 'success',
             data: {
-                audioUrl,
+                audioUrl: `data:audio/mp3;base64,${base64Audio}`,
             },
         });
     } catch (err) {
