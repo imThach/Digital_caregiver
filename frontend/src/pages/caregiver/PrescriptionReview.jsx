@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import useDocumentTitle from '../../hooks/useDocumentTitle'
 import { useLocation, useNavigate } from 'react-router-dom'
 import MainLayout from '../../components/layouts/MainLayout'
 import useCaregiverStore from '../../store/useCaregiverStore'
@@ -8,6 +9,7 @@ import ImageLightboxModal from '../../components/common/ImageLightboxModal'
 export function PrescriptionReview() {
   const location = useLocation()
   const navigate = useNavigate()
+  useDocumentTitle('Xác nhận đơn thuốc')
   const { selectedElderly, fetchElderlyList } = useCaregiverStore()
 
   useEffect(() => {
@@ -22,27 +24,22 @@ export function PrescriptionReview() {
   const passedData = location.state || {}
   const prescriptionId = passedData.prescriptionId
   const imageUrl = passedData.imageUrl || 'https://placeholder.co/600x400?text=Prescription+Image'
+  const hasExtractedMedications =
+    Array.isArray(passedData.extractedMedications) && passedData.extractedMedications.length > 0
+  const isManualEntry = passedData.entryMode === 'manual' || !hasExtractedMedications
+  const blankMedication = {
+    name: '',
+    purpose: '',
+    dosage: '1 Viên',
+    instructions: '',
+    scheduleTimes: ['07:00'],
+  }
   const [prescriptionTitle, setPrescriptionTitle] = useState(passedData.prescriptionTitle || '')
   const [startDateOption, setStartDateOption] = useState('today') // 'today' | 'tomorrow' | 'custom'
   const [customStartDate, setCustomStartDate] = useState('')
 
   const [medications, setMedications] = useState(
-    passedData.extractedMedications || [
-      {
-        name: 'Lisinopril 10mg',
-        purpose: 'Huyết áp cao',
-        dosage: '1 Viên',
-        instructions: 'Uống sau bữa ăn sáng',
-        scheduleTimes: ['08:00'],
-      },
-      {
-        name: 'Metformin 500mg',
-        purpose: 'Tiểu đường Tuýp 2',
-        dosage: '1 Viên',
-        instructions: 'Uống cùng thức ăn',
-        scheduleTimes: ['13:00'],
-      },
-    ]
+    hasExtractedMedications ? passedData.extractedMedications : [blankMedication]
   )
 
   const [isSaving, setIsSaving] = useState(false)
@@ -90,10 +87,36 @@ export function PrescriptionReview() {
     setMedications(medications.filter((_, i) => i !== index))
   }
 
+  const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/
+
   const handleConfirmSaveSchedule = async () => {
     setIsSaving(true)
     setSaveSuccessMsg('')
     setErrorMessage('')
+
+    for (let i = 0; i < medications.length; i++) {
+      const med = medications[i]
+      if (!med.name || !med.name.trim()) {
+        setErrorMessage(`Tên thuốc ở mục thứ ${i + 1} không được để trống.`)
+        setIsSaving(false)
+        return
+      }
+
+      const times = Array.isArray(med.scheduleTimes) ? med.scheduleTimes.filter(Boolean) : []
+      if (times.length === 0) {
+        setErrorMessage(`Vui lòng nhập ít nhất 1 giờ uống (định dạng HH:MM) cho thuốc "${med.name}".`)
+        setIsSaving(false)
+        return
+      }
+
+      for (const t of times) {
+        if (!TIME_REGEX.test(t)) {
+          setErrorMessage(`Giờ uống "${t}" của thuốc "${med.name}" không đúng định dạng 24h HH:MM. Ví dụ hợp lệ: 08:00, 13:30, 18:00.`)
+          setIsSaving(false)
+          return
+        }
+      }
+    }
 
     try {
       let selectedDate = new Date()
@@ -134,15 +157,21 @@ export function PrescriptionReview() {
       <div className="rounded-xl border-l-4 border-[#0058be] bg-[#eff4ff] p-4 shadow-sm">
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined text-[#0058be]">
-            {prescriptionId ? 'edit_document' : 'check_circle'}
+            {prescriptionId ? 'edit_document' : isManualEntry ? 'edit_note' : 'check_circle'}
           </span>
           <div>
             <p className="m-0 font-bold text-[#0058be]">
-              {prescriptionId ? 'Chỉnh Sửa Đơn Thuốc Đã Có' : 'Prescription Analyzed by Gemini AI'}
+              {prescriptionId
+                ? 'Chỉnh Sửa Đơn Thuốc Đã Có'
+                : isManualEntry
+                ? 'Nhập Đơn Thuốc Thủ Công'
+                : 'Prescription Analyzed by Gemini AI'}
             </p>
             <p className="m-0 text-xs text-[#424754]">
               {prescriptionId
                 ? 'Thay đổi thông tin tên thuốc, liều dùng, giờ uống rồi nhấn "Cập nhật đơn thuốc".'
+                : isManualEntry
+                ? 'Vui lòng nhập thông tin thuốc từ đơn thật trước khi nhấn "Lưu & Tạo lịch nhắc".'
                 : 'Vui lòng kiểm tra lại danh mục thuốc trích xuất trước khi nhấn "Lưu & Tạo lịch nhắc".'}
             </p>
           </div>
@@ -335,15 +364,25 @@ export function PrescriptionReview() {
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-[#737f90]">Buổi uống (Giờ thông báo)</label>
+                      <label className="text-[11px] font-bold text-[#737f90]">Buổi uống (Giờ thông báo HH:MM)</label>
                       <input
                         type="text"
                         value={Array.isArray(med.scheduleTimes) ? med.scheduleTimes.join(', ') : '07:00'}
                         onChange={(e) => handleMedicationChange(index, 'scheduleTimes', e.target.value.split(',').map((s) => s.trim()))}
-                        placeholder="07:00 (Sáng), 11:00 (Trưa), 18:00 (Tối)"
-                        className="mt-1 w-full rounded-lg border border-[#c2c6d6] bg-white px-3 py-1.5 text-sm text-[#0058be] font-bold"
+                        placeholder="07:00, 11:00, 18:00"
+                        className={`mt-1 w-full rounded-lg border px-3 py-1.5 text-sm font-bold ${
+                          Array.isArray(med.scheduleTimes) && med.scheduleTimes.some((t) => t && !TIME_REGEX.test(t))
+                            ? 'border-[#ba1a1a] bg-[#ba1a1a]/5 text-[#ba1a1a]'
+                            : 'border-[#c2c6d6] bg-white text-[#0058be]'
+                        }`}
                       />
-                      <span className="text-[10px] text-[#737f90] block mt-0.5">Mặc định 4 buổi: Sáng (07:00), Trưa (11:00), Tối (18:00), Đêm (21:00)</span>
+                      {Array.isArray(med.scheduleTimes) && med.scheduleTimes.some((t) => t && !TIME_REGEX.test(t)) ? (
+                        <span className="text-[11px] font-bold text-[#ba1a1a] block mt-0.5">
+                          ⚠️ Định dạng giờ không hợp lệ! Vui lòng nhập chuẩn 24h HH:MM (ví dụ: 08:00, 13:30, 18:00).
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[#737f90] block mt-0.5">Mặc định 4 buổi: Sáng (07:00), Trưa (11:00), Tối (18:00), Đêm (21:00)</span>
+                      )}
                     </div>
                     <div>
                       <label className="text-[11px] font-bold text-[#737f90]">Tổng số lượng kê (Số viên/hộp)</label>

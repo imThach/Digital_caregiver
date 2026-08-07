@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
+import useDocumentTitle from '../../hooks/useDocumentTitle'
 import MainLayout from '../../components/layouts/MainLayout'
 import useCaregiverStore from '../../store/useCaregiverStore'
 import { medicationApi, prescriptionApi } from '../../api/apiServices'
 
 export function ElderlyOverview() {
   const { selectedElderly, fetchElderlyList } = useCaregiverStore()
+  useDocumentTitle(selectedElderly ? `${selectedElderly.nickname || selectedElderly.fullName}` : 'Tổng quan')
 
   useEffect(() => {
     if (!selectedElderly) {
@@ -65,10 +67,7 @@ export function ElderlyOverview() {
   const handleConfirmTake = async (scheduleId) => {
     try {
       await medicationApi.logMedicationStatus(scheduleId, elderlyId, 'taken')
-      setSchedules((prev) =>
-        prev.map((s) => (s._id === scheduleId || s.scheduleId === scheduleId ? { ...s, status: 'taken' } : s))
-      )
-      loadOverviewData()
+      await loadOverviewData()
     } catch (err) {
       console.error('Error logging medication taken:', err)
     }
@@ -78,10 +77,7 @@ export function ElderlyOverview() {
   const handleSnooze = async (scheduleId) => {
     try {
       await medicationApi.logMedicationStatus(scheduleId, elderlyId, 'snoozed', 10)
-      setSchedules((prev) =>
-        prev.map((s) => (s._id === scheduleId || s.scheduleId === scheduleId ? { ...s, status: 'snoozed' } : s))
-      )
-      loadOverviewData()
+      await loadOverviewData()
     } catch (err) {
       console.error('Error logging medication snooze:', err)
     }
@@ -158,7 +154,7 @@ export function ElderlyOverview() {
 
   const renderScheduleCard = (s) => (
     <div
-      key={s.scheduleId || s._id}
+      key={s.scheduleId}
       className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border p-4 transition-all ${
         s.status === 'taken'
           ? 'border-[#006c49]/30 bg-[#006c49]/5'

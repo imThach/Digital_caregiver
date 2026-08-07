@@ -1,6 +1,8 @@
+
 import "dotenv/config";
 import app from "./app.js";
 import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
 import {
     connectDatabase,
     disconnectDatabase,
@@ -27,6 +29,21 @@ async function startServer() {
         });
 
         app.set("io", io);
+
+        // Middleware xác thực Token cho Socket.IO
+        io.use((socket, next) => {
+            const token = socket.handshake.auth?.token;
+            if (!token) {
+                return next(new Error("Authentication error: Token missing"));
+            }
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                socket.user = decoded;
+                next();
+            } catch (err) {
+                return next(new Error("Authentication error: Invalid token"));
+            }
+        });
 
         io.on("connection", (socket) => {
             console.log(`🔌 Client kết nối Socket: ${socket.id}`);

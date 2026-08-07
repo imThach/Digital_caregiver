@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import useDocumentTitle from '../../hooks/useDocumentTitle'
 import MainLayout from '../../components/layouts/MainLayout'
 import useCaregiverStore from '../../store/useCaregiverStore'
 import { emergencyApi, medicationApi, prescriptionApi } from '../../api/apiServices'
@@ -7,6 +8,7 @@ export function AlertsHistory() {
   const { selectedElderly } = useCaregiverStore()
   const patientNickname = selectedElderly?.nickname || selectedElderly?.fullName || 'Người thân'
   const elderlyId = selectedElderly?._id || 'my-elderly'
+  useDocumentTitle('Cảnh báo & Lịch sử')
 
   const [alerts, setAlerts] = useState([])
   const [schedules, setSchedules] = useState([])
@@ -90,7 +92,7 @@ export function AlertsHistory() {
   }
 
   // Calculate Metrics
-  const activeEmergencyAlerts = alerts.filter((a) => a.status === 'triggered' || a.status === 'pending')
+  const activeEmergencyAlerts = alerts.filter((a) => a.status === 'active')
   const missedOrSnoozedMedications = schedules.filter((s) => s.status === 'missed' || s.status === 'snoozed')
   const totalActiveUrgentAlerts = activeEmergencyAlerts.length + missedOrSnoozedMedications.length
 

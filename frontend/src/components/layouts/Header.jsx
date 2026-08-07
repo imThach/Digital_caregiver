@@ -8,11 +8,25 @@ export function Header({
   subtitle = 'Manage your elderly family members',
   onAddElderly,
   userInitials,
+  onToggleSidebar,
 }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const userMenuRef = useRef(null)
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
+
+  const computedInitials =
+    userInitials ||
+    (user?.fullName
+      ? user.fullName
+          .trim()
+          .split(/\s+/)
+          .map((n) => n[0])
+          .join('')
+          .slice(0, 2)
+          .toUpperCase()
+      : null) ||
+    'ME'
 
   useEffect(() => {
     applyTheme()
@@ -47,13 +61,25 @@ export function Header({
     <>
       <header className="sticky top-0 z-40 border-b border-[#c2c6d6] bg-[#f8f9ff]/85 shadow-sm backdrop-blur-md">
         <div className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div className="flex-1">
-            <h1 className="m-0 text-2xl font-bold tracking-tight text-[#0058be] sm:text-3xl">{title}</h1>
-            {subtitle && (
-              <p className="m-0 mt-1 hidden text-sm text-[#424754] sm:block">
-                {subtitle}
-              </p>
+          <div className="flex items-center gap-3 flex-1">
+            {onToggleSidebar && (
+              <button
+                onClick={onToggleSidebar}
+                className="grid h-10 w-10 place-items-center rounded-xl border border-[#c2c6d6] bg-white text-[#0058be] shadow-sm hover:bg-[#e5eeff] lg:hidden cursor-pointer"
+                type="button"
+                aria-label="Toggle Navigation Menu"
+              >
+                <Icon name="menu" className="h-6 w-6" />
+              </button>
             )}
+            <div>
+              <h1 className="m-0 text-xl font-bold tracking-tight text-[#0058be] sm:text-3xl">{title}</h1>
+              {subtitle && (
+                <p className="m-0 mt-1 hidden text-sm text-[#424754] sm:block">
+                  {subtitle}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-2 sm:gap-3">
@@ -86,7 +112,7 @@ export function Header({
                 aria-expanded={isUserMenuOpen}
                 onClick={() => setIsUserMenuOpen((isOpen) => !isOpen)}
               >
-                {userInitials || 'NA'}
+                {computedInitials}
               </button>
 
               {isUserMenuOpen && (

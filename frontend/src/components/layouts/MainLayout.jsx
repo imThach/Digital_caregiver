@@ -12,18 +12,31 @@ export function MainLayout({
   onAddElderly,
   userInitials,
 }) {
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false)
+  
   return (
     <div className="flex min-h-svh flex-col bg-[#e5eeff] text-[#0b1c30]">
       <CaregiverSosAlertModal />
 
-      {showSidebar && <Sidebar patientName={patientName} />}
+      {showSidebar && (
+        <Sidebar
+          patientName={patientName}
+          isOpen={isMobileSidebarOpen}
+          onClose={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
 
-      <div className={`flex min-h-svh flex-col ${showSidebar ? 'ml-64 w-[calc(100%-16rem)]' : 'w-full'}`}>
+      <div
+        className={`flex min-h-svh flex-col transition-all duration-300 ${
+          showSidebar ? 'ml-0 w-full lg:ml-64 lg:w-[calc(100%-16rem)]' : 'w-full'
+        }`}
+      >
         <Header
           title={headerTitle}
           subtitle={headerSubtitle}
           onAddElderly={onAddElderly}
           userInitials={userInitials}
+          onToggleSidebar={showSidebar ? () => setIsMobileSidebarOpen((prev) => !prev) : undefined}
         />
 
         <main className="mx-auto w-full max-w-[1280px] flex-1 space-y-8 px-4 py-8 sm:px-6">

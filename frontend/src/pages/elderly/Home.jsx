@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import useDocumentTitle from '../../hooks/useDocumentTitle'
 import { useNavigate } from 'react-router-dom'
 import { medicationApi, emergencyApi, aiAssistantApi } from '../../api/apiServices'
-import useCaregiverStore from '../../store/useCaregiverStore'
 import { useAuth } from '../../auth/authProvider'
 import ImageLightboxModal from '../../components/common/ImageLightboxModal'
 import MedicationReminderModal from '../../components/elderly/MedicationReminderModal'
@@ -9,10 +9,10 @@ import MedicationReminderModal from '../../components/elderly/MedicationReminder
 export function ElderlyHome() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { selectedElderly } = useCaregiverStore()
 
-  const elderlyId = selectedElderly?._id || user?._id || 'my-elderly'
-  const patientNickname = selectedElderly?.nickname || selectedElderly?.fullName || user?.nickname || user?.fullName || 'Bà Lan'
+  const elderlyId = user?._id || 'my-elderly'
+  const patientNickname = user?.nickname || user?.fullName || 'Bà Lan'
+  useDocumentTitle('Trang chủ')
 
   // Clock state
   const [currentTimeStr, setCurrentTimeStr] = useState('')
@@ -55,6 +55,7 @@ export function ElderlyHome() {
   const [isAiReplying, setIsAiReplying] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const currentAudioRef = useRef(null)
+  const recognitionRef = useRef(null)
 
   const playLocalSynthesis = useCallback((textToSpeak) => {
     if (!('speechSynthesis' in window)) return
@@ -504,11 +505,32 @@ export function ElderlyHome() {
     }
   }
 
+  // Cleanup Speech Recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort()
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [])
+
   // Voice Input Speech Recognition
   const handleStartSpeechInput = () => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       alert('Trình duyệt không hỗ trợ nhận diện giọng nói. Bạn có thể gõ câu hỏi vào ô chat.')
       return
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort()
+      } catch (e) {
+        console.warn('Error aborting previous recognition instance:', e)
+      }
     }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -526,7 +548,13 @@ export function ElderlyHome() {
       }
     }
 
-    recognition.start()
+    recognitionRef.current = recognition
+
+    try {
+      recognition.start()
+    } catch (e) {
+      console.warn('Error starting speech recognition:', e)
+    }
   }
 
   // Helper render item in schedule list drawer

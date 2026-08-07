@@ -1,13 +1,9 @@
 import axios from 'axios';
 import { clearAuthSession, getAuthToken } from '../auth/tokenStorage.js';
-
-const defaultRenderUrl = 'https://digital-caregiver-0mv1.onrender.com';
-const isProductionDomain = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || (isProductionDomain ? defaultRenderUrl : 'http://localhost:3001');
+import { API_BASE_URL } from './config.js';
 
 const axiosClient = axios.create({
-    baseURL: apiBaseUrl,
+    baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -26,7 +22,16 @@ axiosClient.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Tự động bóc tách dữ liệu & Xử lý lỗi 401 Unauthorized
+/**
+ * Response Interceptor: Tự động bóc tách dữ liệu & Xử lý lỗi 401 Unauthorized
+ *
+ * Interceptor này trả về `response.data` (Axios layer), tức là body JSON từ server.
+ * Server luôn trả về dạng: { status: string, data: any, message?: string, pagination?: object }
+ *
+ * => Tại call site, truy cập payload thật qua `res.data`:
+ *    const res = await someApi.getSomething()  // res = { status, data, message? }
+ *    const items = res.data                    // items = payload thực tế
+ */
 axiosClient.interceptors.response.use(
     (response) => {
         return response.data;

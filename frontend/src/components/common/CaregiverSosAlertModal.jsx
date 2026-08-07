@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { socket } from '../../utils/socket'
 import { emergencyApi } from '../../api/apiServices'
+import { useAuth } from '../../auth/authProvider'
 
 export function CaregiverSosAlertModal() {
+  const { user } = useAuth()
+  const isCaregiver = user?.role === 'caregiver'
   const [activeSosEvent, setActiveSosEvent] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const sirenRef = useRef(null)
@@ -60,11 +63,12 @@ export function CaregiverSosAlertModal() {
   }, [])
 
   const checkActiveSosHistory = useCallback(async () => {
+    if (!isCaregiver) return
     try {
       const res = await emergencyApi.getHistory()
       const list = res.data || []
       // Find latest unacknowledged / unresolved SOS event
-      const activeEvent = list.find((e) => e.status === 'active' || e.status === 'triggered' || e.status === 'pending')
+      const activeEvent = list.find((e) => e.status === 'active')
 
       if (activeEvent) {
         setActiveSosEvent(activeEvent)
@@ -76,9 +80,11 @@ export function CaregiverSosAlertModal() {
     } catch (err) {
       console.error('Error fetching emergency SOS status:', err)
     }
-  }, [startSiren, stopSiren])
+  }, [isCaregiver, startSiren, stopSiren])
 
   useEffect(() => {
+    if (!isCaregiver) return
+
     checkActiveSosHistory()
 
     // 5-second polling for immediate alert check
@@ -111,7 +117,7 @@ export function CaregiverSosAlertModal() {
       socket.off('sos_acknowledged', handleSosAcknowledged)
       stopSiren()
     }
-  }, [checkActiveSosHistory, startSiren, stopSiren])
+  }, [isCaregiver, checkActiveSosHistory, startSiren, stopSiren])
 
   const handleAction = async (status) => {
     if (!activeSosEvent || !activeSosEvent._id) {
@@ -133,7 +139,7 @@ export function CaregiverSosAlertModal() {
     }
   }
 
-  if (!activeSosEvent) return null
+  if (!isCaregiver || !activeSosEvent) return null
 
   const elderlyName = activeSosEvent.elderlyId?.nickname || activeSosEvent.elderlyId?.fullName || 'Người thân của bạn'
   const mapsLink = activeSosEvent.mapsLink || (activeSosEvent.latitude ? `https://www.google.com/maps?q=${activeSosEvent.latitude},${activeSosEvent.longitude}` : null)

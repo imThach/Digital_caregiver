@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useDocumentTitle from '../../hooks/useDocumentTitle'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../../components/layouts/MainLayout'
 import { SummaryCard, ProfileCard } from '../../components/common/Card'
@@ -9,6 +10,7 @@ import useCaregiverStore from '../../store/useCaregiverStore'
 export function CaregiverDashboard() {
   const navigate = useNavigate()
   const { elderlyList, fetchElderlyList, setSelectedElderly } = useCaregiverStore()
+  useDocumentTitle('Bảng điều khiển')
 
   const [dashboardData, setDashboardData] = useState(null)
 
@@ -16,6 +18,7 @@ export function CaregiverDashboard() {
   const [showPairingModal, setShowPairingModal] = useState(false)
   const [generatedPairingCode, setGeneratedPairingCode] = useState('')
   const [isGeneratingCode, setIsGeneratingCode] = useState(false)
+  const [pairingError, setPairingError] = useState('')
 
   useEffect(() => {
     async function loadData() {
@@ -33,18 +36,25 @@ export function CaregiverDashboard() {
   const handleOpenAddElderly = async () => {
     setShowPairingModal(true)
     setIsGeneratingCode(true)
+    setPairingError('')
+    setGeneratedPairingCode('')
     try {
       const res = await pairingApi.generateCode()
-      setGeneratedPairingCode(res.data?.pairingCode || '839201')
+      if (res.data?.pairingCode) {
+        setGeneratedPairingCode(res.data.pairingCode)
+      } else {
+        setPairingError('Không thể tạo mã kết nối. Vui lòng thử lại sau.')
+      }
     } catch (err) {
-      setGeneratedPairingCode('839201')
+      console.error('Lỗi khi tạo mã kết nối:', err)
+      setPairingError(err.response?.data?.message || err.message || 'Không thể tạo mã kết nối. Vui lòng thử lại sau.')
     } finally {
       setIsGeneratingCode(false)
     }
   }
 
   // Calculate summary metrics
-  const totalCount = elderlyList.length || 2
+  const totalCount = elderlyList.length
   const adherencePercent = dashboardData?.summary?.overallAdherenceRate !== undefined
     ? Math.round(dashboardData.summary.overallAdherenceRate)
     : 85
@@ -90,56 +100,23 @@ export function CaregiverDashboard() {
     },
   ]
 
-  // Map API elderly list or fallback profiles
-  const profilesToDisplay = elderlyList.length > 0
-    ? elderlyList.map((elderly) => ({
-      _id: elderly._id,
-      name: elderly.nickname || elderly.fullName || 'Người thân',
-      age: elderly.dateOfBirth ? `${new Date().getFullYear() - new Date(elderly.dateOfBirth).getFullYear()} years` : '78 years',
-      initials: (elderly.nickname || elderly.fullName || 'RC').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
-      gradient: 'from-[#d8e2ff] via-[#fefcff] to-[#ffdcc6]',
-      avatarTone: '#0058be',
-      doses: '4 / 6 Taken',
-      doseColor: '#0b1c30',
-      progress: 66,
-      progressColor: '#0058be',
-      nextLabel: 'Next: 4:00 PM',
-      nextIcon: 'clock',
-      caregivers: ['AL', 'MJ', '+1'],
-      raw: elderly,
-    }))
-    : [
-      {
-        _id: 'default-1',
-        name: 'Robert Chen',
-        age: '78 years',
-        initials: 'RC',
-        gradient: 'from-[#d8e2ff] via-[#fefcff] to-[#ffdcc6]',
-        avatarTone: '#0058be',
-        doses: '4 / 6 Taken',
-        doseColor: '#0b1c30',
-        progress: 66,
-        progressColor: '#0058be',
-        nextLabel: 'Next: 4:00 PM',
-        nextIcon: 'clock',
-        caregivers: ['AL', 'MJ', '+1'],
-      },
-      {
-        _id: 'default-2',
-        name: 'Maria Garcia',
-        age: '82 years',
-        initials: 'MG',
-        gradient: 'from-[#ffdcc6] via-[#ffffff] to-[#6ffbbe]',
-        avatarTone: '#924700',
-        doses: '5 / 5 Taken',
-        doseColor: '#006c49',
-        progress: 100,
-        progressColor: '#006c49',
-        nextLabel: 'Completed for today',
-        nextIcon: 'done',
-        caregivers: ['SC'],
-      },
-    ]
+  // Map API elderly list to display profiles
+  const profilesToDisplay = elderlyList.map((elderly) => ({
+    _id: elderly._id,
+    name: elderly.nickname || elderly.fullName || 'Người thân',
+    age: elderly.dateOfBirth ? `${new Date().getFullYear() - new Date(elderly.dateOfBirth).getFullYear()} years` : '78 years',
+    initials: (elderly.nickname || elderly.fullName || 'RC').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
+    gradient: 'from-[#d8e2ff] via-[#fefcff] to-[#ffdcc6]',
+    avatarTone: '#0058be',
+    doses: '4 / 6 Taken',
+    doseColor: '#0b1c30',
+    progress: 66,
+    progressColor: '#0058be',
+    nextLabel: 'Next: 4:00 PM',
+    nextIcon: 'clock',
+    caregivers: ['AL', 'MJ', '+1'],
+    raw: elderly,
+  }))
 
   const handleSelectAndNavigate = (profile) => {
     if (profile.raw) {
@@ -223,15 +200,23 @@ export function CaregiverDashboard() {
             </div>
 
             <div className="py-6 text-center">
-              <p className="text-sm text-[#424754]">
-                Nhập mã 6 chữ số bên dưới trên ứng dụng thiết bị của Người cao tuổi:
-              </p>
-              <div className="my-4 inline-block rounded-2xl border-2 border-[#0058be] bg-[#eff4ff] px-6 py-4">
-                <span className="font-mono text-4xl font-black tracking-widest text-[#0058be]">
-                  {isGeneratingCode ? '------' : generatedPairingCode}
-                </span>
-              </div>
-              <p className="text-xs text-[#737f90]">Mã này có hiệu lực trong 24 giờ kể từ thời điểm tạo.</p>
+              {pairingError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                  <p className="m-0 text-sm font-semibold text-red-600">{pairingError}</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-[#424754]">
+                    Nhập mã 6 chữ số bên dưới trên ứng dụng thiết bị của Người cao tuổi:
+                  </p>
+                  <div className="my-4 inline-block rounded-2xl border-2 border-[#0058be] bg-[#eff4ff] px-6 py-4">
+                    <span className="font-mono text-4xl font-black tracking-widest text-[#0058be]">
+                      {isGeneratingCode ? '------' : generatedPairingCode}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#737f90]">Mã này có hiệu lực trong 24 giờ kể từ thời điểm tạo.</p>
+                </>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 border-t border-[#c2c6d6]/30 pt-4">

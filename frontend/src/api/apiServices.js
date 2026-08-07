@@ -1,13 +1,9 @@
 import axiosClient from './axiosClient';
-
-const defaultRenderUrl = 'https://digital-caregiver-0mv1.onrender.com';
-const isProductionDomain = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-
-const apiBaseUrl = import.meta.env.VITE_API_URL || (isProductionDomain ? defaultRenderUrl : 'http://localhost:3001');
+import { API_BASE_URL } from './config.js';
 
 // 1. Auth API
 export const authApi = {
-    getGoogleLoginUrl: () => `${apiBaseUrl}/api/v1/auth/google`,
+    getGoogleLoginUrl: () => `${API_BASE_URL}/api/v1/auth/google`,
     sendOtp: (email) => axiosClient.post('/api/v1/auth/send-otp', { email }),
     verifyOtp: (email, otp) => axiosClient.post('/api/v1/auth/verify-otp', { email, otp }),
     getMe: () => axiosClient.get('/api/v1/auth/me'),

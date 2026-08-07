@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import MainLayout from '../../components/layouts/MainLayout';
 import { pairingApi } from '../../api/apiServices';
 import useCaregiverStore from '../../store/useCaregiverStore';
@@ -18,7 +19,10 @@ const FIELD_LABELS = {
 
 export function ElderlyProfile() {
     const { checkAuth } = useAuth();
-    const { user, setUser, fetchElderlyList } = useCaregiverStore();
+    useDocumentTitle('Hồ sơ gia đình');
+    const user = useCaregiverStore((state) => state.user);
+    const setUser = useCaregiverStore((state) => state.setUser);
+    const fetchElderlyList = useCaregiverStore((state) => state.fetchElderlyList);
 
     // Family Profile Completion State & Missing Fields
     const [isFamilyProfileComplete, setIsFamilyProfileComplete] = useState(true);
@@ -48,6 +52,9 @@ export function ElderlyProfile() {
     const [statusMessage, setStatusMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
 
+    const userFullName = user?.fullName;
+    const userPhone = user?.phone;
+
     const loadFamilyProfileData = useCallback(async () => {
         try {
             const res = await pairingApi.getFamilyProfile();
@@ -61,11 +68,11 @@ export function ElderlyProfile() {
                 }
 
                 if (caregiver) {
-                    setCaregiverFullName(caregiver.fullName || user?.fullName || '');
-                    setCaregiverPhone(caregiver.phone || user?.phone || '');
-                } else if (user) {
-                    setCaregiverFullName(user.fullName || '');
-                    setCaregiverPhone(user.phone || '');
+                    setCaregiverFullName(caregiver.fullName || userFullName || '');
+                    setCaregiverPhone(caregiver.phone || userPhone || '');
+                } else if (userFullName || userPhone) {
+                    setCaregiverFullName(userFullName || '');
+                    setCaregiverPhone(userPhone || '');
                 }
 
                 if (elderly) {
@@ -84,18 +91,20 @@ export function ElderlyProfile() {
             console.error('Lỗi tải thông tin Family Profile:', err);
         }
         fetchElderlyList();
-    }, [fetchElderlyList, user]);
+    }, [fetchElderlyList, userFullName, userPhone]);
 
     // Load initial family profile & elderly list
     useEffect(() => {
         loadFamilyProfileData();
     }, [loadFamilyProfileData]);
 
+    const userId = user?._id;
+
     // Socket Listener for Instant Pairing Notification
     useEffect(() => {
         const handlePairingSuccess = (data) => {
             console.log('⚡ Received pairing_success event via socket:', data);
-            if (!user?._id || String(data.caregiverId) === String(user._id)) {
+            if (!userId || String(data.caregiverId) === String(userId)) {
                 setStatusMessage(`🎉 THÔNG BÁO TỨC THÌ: Người cao tuổi (${data.elderlyName || 'Elderly'}) đã nhập mã ghép đôi thành công!`);
                 setCodeSuccessMsg(`Đã kết nối thành công với ${data.elderlyName || 'Người cao tuổi'}!`);
                 loadFamilyProfileData();
@@ -107,7 +116,7 @@ export function ElderlyProfile() {
         return () => {
             socket.off('pairing_success', handlePairingSuccess);
         };
-    }, [user, loadFamilyProfileData]);
+    }, [userId, loadFamilyProfileData]);
 
     const isFieldMissing = (fieldName) => missingFields.includes(fieldName);
 
@@ -132,18 +141,20 @@ export function ElderlyProfile() {
     const handleGeneratePairingCode = async () => {
         setIsGeneratingCode(true);
         setCodeSuccessMsg('');
+        setErrorMessage('');
         try {
             const res = await pairingApi.generateCode();
             if (res.data?.pairingCode) {
                 setGeneratedCode(res.data.pairingCode);
                 setCodeSuccessMsg('Mã kết nối 6 chữ số đã được tạo! Nhập mã này trên màn hình kết nối của thiết bị Người cao tuổi.');
             } else {
-                setGeneratedCode('839201');
-                setCodeSuccessMsg('Mã kết nối mẫu: 839201');
+                setGeneratedCode(null);
+                setErrorMessage('Không thể tạo mã kết nối. Vui lòng thử lại sau.');
             }
         } catch (err) {
-            setGeneratedCode('839201');
-            setCodeSuccessMsg('Mã kết nối mẫu: 839201 (Hệ thống sẵn sàng)');
+            console.error('Lỗi khi tạo mã kết nối:', err);
+            setGeneratedCode(null);
+            setErrorMessage(err.response?.data?.message || err.message || 'Không thể tạo mã kết nối. Vui lòng thử lại sau.');
         } finally {
             setIsGeneratingCode(false);
         }

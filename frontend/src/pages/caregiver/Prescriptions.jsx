@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../../components/layouts/MainLayout';
 import useCaregiverStore from '../../store/useCaregiverStore';
@@ -7,6 +8,7 @@ import ImageLightboxModal from '../../components/common/ImageLightboxModal';
 
 export function Prescriptions() {
   const navigate = useNavigate();
+  useDocumentTitle('Đơn thuốc');
   const { selectedElderly, fetchElderlyList } = useCaregiverStore();
   const patientNickname = selectedElderly?.nickname || selectedElderly?.fullName || 'Người cao tuổi';
   const elderlyId = selectedElderly?._id;
@@ -91,8 +93,29 @@ export function Prescriptions() {
     if (file) {
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
+      setErrorMessage('');
+      setSuccessMessage('');
       handleUploadAndAnalyze(file);
     }
+  };
+
+  const handleManualEntry = () => {
+    navigate('/prescription-review', {
+      state: {
+        imageUrl: previewUrl || '',
+        prescriptionTitle: 'Đơn thuốc mới (Nhập thủ công)',
+        entryMode: 'manual',
+        extractedMedications: [
+          {
+            name: '',
+            purpose: '',
+            dosage: '1 Viên',
+            instructions: '',
+            scheduleTimes: ['07:00'],
+          },
+        ],
+      },
+    });
   };
 
   const handleUploadAndAnalyze = async (fileToUpload) => {
@@ -126,6 +149,13 @@ export function Prescriptions() {
       const cloudImageUrl = res.data?.imageUrl || previewUrl;
       const extractedMeds = res.data?.extractedMedications || [];
 
+      if (extractedMeds.length === 0) {
+        setIsAnalyzing(false);
+        setProgress(0);
+        setErrorMessage('Gemini AI không trích xuất được thuốc nào từ ảnh này. Vui lòng thử lại với ảnh rõ hơn hoặc nhập thủ công.');
+        return;
+      }
+
       setTimeout(() => {
         navigate('/prescription-review', {
           state: {
@@ -138,31 +168,10 @@ export function Prescriptions() {
       clearInterval(interval);
       setIsAnalyzing(false);
       setProgress(0);
-      setErrorMessage(err.message || 'Phân tích hình ảnh thất bại. Đang mở trang xem lại mẫu...');
-
-      setTimeout(() => {
-        navigate('/prescription-review', {
-          state: {
-            imageUrl: previewUrl || 'https://placeholder.co/600x400?text=Prescription+Image',
-            extractedMedications: [
-              {
-                name: 'Lisinopril 10mg',
-                purpose: 'Huyết áp cao',
-                dosage: '1 Viên',
-                instructions: 'Uống sau bữa ăn sáng',
-                scheduleTimes: ['08:00'],
-              },
-              {
-                name: 'Metformin 500mg',
-                purpose: 'Tểu đường Tuýp 2',
-                dosage: '1 Viên',
-                instructions: 'Uống cùng thức ăn',
-                scheduleTimes: ['13:00'],
-              },
-            ],
-          },
-        });
-      }, 1200);
+      const detail = err.response?.data?.message || err.message;
+      setErrorMessage(
+        `Gemini AI phân tích thất bại${detail ? `: ${detail}` : '.'} Vui lòng thử lại với ảnh rõ hơn hoặc nhập thủ công.`
+      );
     }
   };
 
@@ -356,6 +365,26 @@ export function Prescriptions() {
                 Chọn ảnh đơn thuốc
               </div>
             </label>
+            {selectedFile && !isAnalyzing && (
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                <button
+                  type="button"
+                  onClick={() => handleUploadAndAnalyze()}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-[#0058be] px-4 py-2.5 text-xs font-bold text-white shadow-md transition hover:bg-[#00479e] cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">refresh</span>
+                  Phân tích lại
+                </button>
+                <button
+                  type="button"
+                  onClick={handleManualEntry}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-[#c2c6d6] bg-white px-4 py-2.5 text-xs font-bold text-[#0b1c30] shadow-sm transition hover:bg-[#f5f7fd] cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">edit_note</span>
+                  Nhập thủ công
+                </button>
+              </div>
+            )}
           </div>
         </section>
 

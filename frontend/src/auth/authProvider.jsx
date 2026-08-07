@@ -1,8 +1,19 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { authApi } from '../api/apiServices.js';
-import { clearAuthSession, saveAuthSession } from './tokenStorage.js';
+import { clearAuthSession, saveAuthSession, getAuthToken } from './tokenStorage.js';
+import { connectSocket, disconnectSocket } from '../utils/socket.js';
 
 const AuthContext = createContext(null);
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+const saveElderlyUserCache = (userData) => {
+    if (!userData) return;
+    const cacheData = {
+        user: userData,
+        timestamp: Date.now(),
+    };
+    localStorage.setItem('cached_elderly_user', JSON.stringify(cacheData));
+};
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
@@ -20,7 +31,12 @@ export function AuthProvider({ children }) {
                 saveAuthSession(currentUser.role);
 
                 if (currentUser.role === 'elderly') {
-                    localStorage.setItem('cached_elderly_user', JSON.stringify(currentUser));
+                    saveElderlyUserCache(currentUser);
+                }
+
+                const token = getAuthToken();
+                if (token) {
+                    connectSocket(token);
                 }
 
                 return { ...currentUser, profileStatus: currentProfileStatus };
@@ -39,10 +55,21 @@ export function AuthProvider({ children }) {
         const cachedUserStr = localStorage.getItem('cached_elderly_user');
         if (cachedRole === 'elderly' && cachedUserStr) {
             try {
-                const cachedUser = JSON.parse(cachedUserStr);
-                setUser(cachedUser);
-                setProfileStatus({ isComplete: true });
-                return cachedUser;
+                const parsed = JSON.parse(cachedUserStr);
+                const cachedUser = parsed?.user || (parsed?._id ? parsed : null);
+                const timestamp = parsed?.timestamp || 0;
+
+                const isExpired = !timestamp || Date.now() - timestamp > SEVEN_DAYS_MS;
+
+                if (!isExpired && cachedUser) {
+                    setUser(cachedUser);
+                    setProfileStatus({ isComplete: true });
+                    const token = getAuthToken();
+                    if (token) {
+                        connectSocket(token);
+                    }
+                    return cachedUser;
+                }
             } catch {
                 // fallthrough
             }
@@ -50,6 +77,7 @@ export function AuthProvider({ children }) {
         setUser(null);
         setProfileStatus(null);
         clearAuthSession();
+        disconnectSocket();
         return null;
     };
 
@@ -61,9 +89,13 @@ export function AuthProvider({ children }) {
         if (userData) {
             setUser(userData);
             setProfileStatus(userData.profileStatus || null);
-            saveAuthSession(userData.role);
+            saveAuthSession(userData.role, userData.token);
             if (userData.role === 'elderly') {
-                localStorage.setItem('cached_elderly_user', JSON.stringify(userData));
+                saveElderlyUserCache(userData);
+            }
+            const token = userData.token || getAuthToken();
+            if (token) {
+                connectSocket(token);
             }
         }
     };
@@ -77,6 +109,7 @@ export function AuthProvider({ children }) {
             setUser(null);
             setProfileStatus(null);
             clearAuthSession();
+            disconnectSocket();
         }
     };
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
 export function SettingsModal({ isOpen, onClose }) {
-    const [language, setLanguage] = useState(() => localStorage.getItem('app_language') || 'vi');
     const [theme, setTheme] = useState(() => localStorage.getItem('app_theme') || 'light');
 
     useEffect(() => {
@@ -22,10 +21,7 @@ export function SettingsModal({ isOpen, onClose }) {
         };
     }, [isOpen, onClose]);
 
-    const handleLanguageChange = (lang) => {
-        setLanguage(lang);
-        localStorage.setItem('app_language', lang);
-    };
+
 
     const handleThemeChange = (selectedTheme) => {
         setTheme(selectedTheme);
@@ -52,7 +48,7 @@ export function SettingsModal({ isOpen, onClose }) {
                         </div>
                         <div>
                             <h3 className="m-0 text-lg font-bold text-[#0b1c30] dark:text-white">Cài đặt ứng dụng</h3>
-                            <p className="m-0 text-xs text-[#737f90] dark:text-[#a3b1c6]">Tùy chỉnh giao diện và ngôn ngữ</p>
+                            <p className="m-0 text-xs text-[#737f90] dark:text-[#a3b1c6]">Tùy chỉnh giao diện hiển thị</p>
                         </div>
                     </div>
 
@@ -67,42 +63,7 @@ export function SettingsModal({ isOpen, onClose }) {
 
                 {/* Body Content */}
                 <div className="space-y-6">
-                    {/* Section 1: Language Selection */}
-                    <div>
-                        <label className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#737f90] dark:text-[#a3b1c6]">
-                            <span className="material-symbols-outlined text-sm">language</span>
-                            Ngôn ngữ (Language)
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button
-                                type="button"
-                                onClick={() => handleLanguageChange('vi')}
-                                className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-bold transition cursor-pointer ${
-                                    language === 'vi'
-                                        ? 'border-[#0058be] bg-[#0058be]/10 text-[#0058be] ring-2 ring-[#0058be]/30 dark:bg-[#0058be]/30 dark:text-white'
-                                        : 'border-[#c2c6d6]/60 bg-white text-[#424754] hover:bg-[#f5f7fd] dark:bg-[#1a3250] dark:border-[#263c5a] dark:text-[#a3b1c6]'
-                                }`}
-                            >
-                                <span className="text-lg">🇻🇳</span>
-                                Tiếng Việt
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => handleLanguageChange('en')}
-                                className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-bold transition cursor-pointer ${
-                                    language === 'en'
-                                        ? 'border-[#0058be] bg-[#0058be]/10 text-[#0058be] ring-2 ring-[#0058be]/30 dark:bg-[#0058be]/30 dark:text-white'
-                                        : 'border-[#c2c6d6]/60 bg-white text-[#424754] hover:bg-[#f5f7fd] dark:bg-[#1a3250] dark:border-[#263c5a] dark:text-[#a3b1c6]'
-                                }`}
-                            >
-                                <span className="text-lg">🇬🇧</span>
-                                English
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Section 2: Theme Light / Dark Mode */}
+                    {/* Theme Light / Dark Mode */}
                     <div>
                         <label className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#737f90] dark:text-[#a3b1c6]">
                             <span className="material-symbols-outlined text-sm">contrast</span>
