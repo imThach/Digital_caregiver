@@ -1,40 +1,40 @@
 import { CaregiverLink, User } from '../models/index.js';
 import AppError from '../utils/appError.js';
-import jwt from 'jsonwebtoken';
+import { signToken } from './authService.js';
 import { uploadImageBuffer } from '../configs/cloudinary.js';
 
-const signToken = (id, role = 'elderly') => {
-    const expiresIn = role === 'elderly' ? '3650d' : (process.env.JWT_EXPIRES_IN || '30d');
-    return jwt.sign({ id, role }, process.env.JWT_SECRET, {
-        expiresIn,
-    });
-};
-
 export const generatePairingCode = async (caregiverId) => {
-    let link = await CaregiverLink.findOne({ caregiverId, status: { $ne: 'revoked' } });
+    // Chỉ lấy link ở trạng thái pending (chưa kích hoạt)
+    let link = await CaregiverLink.findOne({ caregiverId, status: 'pending' }).sort({ createdAt: -1 });
+    const now = new Date();
 
-    if (link && link.pairingCode) {
+    if (link && link.pairingCode && link.pairingCodeExpiresAt && link.pairingCodeExpiresAt > now) {
         return {
             pairingCode: link.pairingCode,
+            pairingCodeExpiresAt: link.pairingCodeExpiresAt,
             status: link.status,
         };
     }
 
     const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     if (link) {
         link.pairingCode = pairingCode;
+        link.pairingCodeExpiresAt = expiresAt;
         await link.save();
     } else {
         link = await CaregiverLink.create({
             caregiverId,
             pairingCode,
+            pairingCodeExpiresAt: expiresAt,
             status: 'pending',
         });
     }
 
     return {
         pairingCode: link.pairingCode,
+        pairingCodeExpiresAt: link.pairingCodeExpiresAt,
         status: link.status,
     };
 };
@@ -42,13 +42,18 @@ export const generatePairingCode = async (caregiverId) => {
 export const connectDeviceWithCode = async (pairingCode, nickname, currentUser, io = null) => {
     const cleanCode = pairingCode.trim();
 
+    // Mã kết nối chỉ hợp lệ khi liên kết đang ở trạng thái pending
     const link = await CaregiverLink.findOne({
         pairingCode: cleanCode,
-        status: { $ne: 'revoked' },
+        status: 'pending',
     });
 
     if (!link) {
-        throw new AppError('Mã kết nối 6 chữ số không chính xác.', 400);
+        throw new AppError('Mã kết nối 6 chữ số không chính xác hoặc đã được sử dụng.', 400);
+    }
+
+    if (link.pairingCodeExpiresAt && link.pairingCodeExpiresAt < new Date()) {
+        throw new AppError('Mã kết nối 6 chữ số đã hết hạn. Vui lòng yêu cầu mã mới từ Người thân.', 400);
     }
 
     let elderlyUser;
@@ -77,7 +82,7 @@ export const connectDeviceWithCode = async (pairingCode, nickname, currentUser, 
     await link.save();
 
     const caregiverUser = await User.findById(link.caregiverId);
-    const token = signToken(elderlyUser._id);
+    const token = signToken(elderlyUser._id, 'elderly', elderlyUser.tokenVersion);
 
     if (io) {
         io.emit('pairing_success', {

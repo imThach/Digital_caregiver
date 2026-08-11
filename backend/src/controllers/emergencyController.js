@@ -5,11 +5,13 @@ import * as emergencyService from '../services/emergencyService.js';
 export const triggerSOS = catchAsync(async (req, res, next) => {
     const { elderlyId, triggeredBy, latitude, longitude } = req.body;
 
-    if (!elderlyId) {
-        return next(new AppError('Vui lòng cung cấp elderlyId.', 400));
-    }
-
-    const data = await emergencyService.triggerSosService(elderlyId, triggeredBy, latitude, longitude);
+    const data = await emergencyService.triggerSosService(
+        elderlyId,
+        triggeredBy,
+        latitude,
+        longitude,
+        req.user
+    );
 
     const io = req.app.get('io');
     if (io) {

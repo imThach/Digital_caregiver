@@ -95,58 +95,53 @@ export const confirmPrescription = catchAsync(async (req, res, next) => {
         });
     }
 
-    const createdMedications = [];
+    const createdMedications = await Promise.all(
+        medications.map(async (medData) => {
+            // Fetch ảnh thuốc song song với các loại thuốc khác
+            let medImageUrl = medData.imageUrl;
+            if (!medImageUrl && medData.name) {
+                medImageUrl = await searchMedicationImage(medData.name);
+            }
 
-    for (const medData of medications) {
-        let medImageUrl = medData.imageUrl;
-        if (!medImageUrl && medData.name) {
-            medImageUrl = await searchMedicationImage(medData.name);
-        }
+            const totalQty = Number(medData.totalQuantity || medData.quantity || 30);
+            const remainingQty = Number(medData.remainingQuantity !== undefined ? medData.remainingQuantity : totalQty);
+            const durationDays = Number(medData.durationDays || Math.ceil(totalQty / (medData.scheduleTimes?.length || 1)));
 
-        const totalQty = Number(medData.totalQuantity || medData.quantity || 30);
-        const remainingQty = Number(medData.remainingQuantity !== undefined ? medData.remainingQuantity : totalQty);
-        const durationDays = Number(medData.durationDays || Math.ceil(totalQty / (medData.scheduleTimes?.length || 1)));
+            let calculatedStartDate = new Date();
+            if (startDate) {
+                calculatedStartDate = new Date(startDate);
+            } else if (medData.startDate) {
+                calculatedStartDate = new Date(medData.startDate);
+            }
+            calculatedStartDate.setHours(0, 0, 0, 0);
 
-        let calculatedStartDate = new Date();
-        if (startDate) {
-            calculatedStartDate = new Date(startDate);
-        } else if (medData.startDate) {
-            calculatedStartDate = new Date(medData.startDate);
-        }
-        calculatedStartDate.setHours(0, 0, 0, 0);
-
-        const medication = await Medication.create({
-            elderlyId: targetElderlyId,
-            prescriptionId: prescription._id,
-            name: medData.name,
-            usageNote: medData.instructions || medData.purpose || '',
-            dosage: medData.dosage || '1 viên',
-            totalQuantity: totalQty,
-            remainingQuantity: remainingQty,
-            durationDays: durationDays,
-            imageUrl: medImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(medData.name || 'Thuốc')}&background=0058be&color=fff&size=256`,
-            startDate: calculatedStartDate,
-            isActive: true,
-        });
-
-        const schedules = [];
-        const times = medData.scheduleTimes && medData.scheduleTimes.length > 0 ? medData.scheduleTimes : ['08:00'];
-
-        for (const timeOfDay of times) {
-            const schedule = await MedicationSchedule.create({
-                medicationId: medication._id,
-                timeOfDay,
-                daysOfWeek: [1, 2, 3, 4, 5, 6, 7], // Mặc định hàng ngày
+            const medication = await Medication.create({
+                elderlyId: targetElderlyId,
+                prescriptionId: prescription._id,
+                name: medData.name,
+                usageNote: medData.instructions || medData.purpose || '',
+                dosage: medData.dosage || '1 viên',
+                totalQuantity: totalQty,
+                remainingQuantity: remainingQty,
+                durationDays: durationDays,
+                imageUrl: medImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(medData.name || 'Thuốc')}&background=0058be&color=fff&size=256`,
+                startDate: calculatedStartDate,
                 isActive: true,
             });
-            schedules.push(schedule);
-        }
 
-        createdMedications.push({
-            medication,
-            schedules,
-        });
-    }
+            const times = medData.scheduleTimes?.length > 0 ? medData.scheduleTimes : ['08:00'];
+            const schedules = await MedicationSchedule.insertMany(
+                times.map((timeOfDay) => ({
+                    medicationId: medication._id,
+                    timeOfDay,
+                    daysOfWeek: [1, 2, 3, 4, 5, 6, 7], // Mặc định hàng ngày
+                    isActive: true,
+                }))
+            );
+
+            return { medication, schedules };
+        })
+    );
 
     res.status(201).json({
         status: 'success',
@@ -172,26 +167,52 @@ export const getElderlyPrescriptions = catchAsync(async (req, res, next) => {
         }
     }
 
-    const prescriptions = await Prescription.find({ elderlyId })
-        .sort({ createdAt: -1 });
+    // Phân trang cho đơn thuốc
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.max(1, Math.min(50, parseInt(req.query.limit, 10) || 10));
+    const skip = (page - 1) * limit;
 
-    const medications = await Medication.find({ elderlyId, isActive: true });
+    const [total, prescriptions] = await Promise.all([
+        Prescription.countDocuments({ elderlyId }),
+        Prescription.find({ elderlyId })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit),
+    ]);
 
-    const medicationsWithSchedules = await Promise.all(
-        medications.map(async (med) => {
-            const schedules = await MedicationSchedule.find({ medicationId: med._id, isActive: true });
-            return {
-                ...med.toObject(),
-                schedules,
-            };
-        })
-    );
+    // Giới hạn an toàn cho danh sách thuốc đang active (không cần phân trang riêng)
+    const limitMeds = Math.max(1, Math.min(100, parseInt(req.query.limitMeds, 10) || 50));
+    const medications = await Medication.find({ elderlyId, isActive: true }).limit(limitMeds);
+
+    // Lấy toàn bộ schedule trong 1 query thay vì N+1 queries
+    const medIds = medications.map((m) => m._id);
+    const allSchedules = await MedicationSchedule.find({ medicationId: { $in: medIds }, isActive: true });
+
+    const schedulesByMedId = allSchedules.reduce((acc, sch) => {
+        const key = sch.medicationId.toString();
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(sch);
+        return acc;
+    }, {});
+
+    const medicationsWithSchedules = medications.map((med) => ({
+        ...med.toObject(),
+        schedules: schedulesByMedId[med._id.toString()] || [],
+    }));
 
     res.status(200).json({
         status: 'success',
         data: {
             prescriptions,
             medications: medicationsWithSchedules,
+        },
+        pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit) || 1,
+            hasNextPage: page < Math.ceil(total / limit),
+            hasPrevPage: page > 1,
         },
     });
 });
@@ -202,6 +223,20 @@ export const deletePrescription = catchAsync(async (req, res, next) => {
     const prescription = await Prescription.findById(id);
     if (!prescription) {
         return next(new AppError('Không tìm thấy đơn thuốc cần xóa.', 404));
+    }
+
+    const isOwner = String(prescription.uploadedBy) === String(req.user._id);
+    let isLinkedCaregiver = false;
+    if (prescription.elderlyId) {
+        isLinkedCaregiver = await CaregiverLink.exists({
+            caregiverId: req.user._id,
+            elderlyId: prescription.elderlyId,
+            status: { $in: ['active', 'pending'] },
+        });
+    }
+
+    if (!isOwner && !isLinkedCaregiver) {
+        return next(new AppError('Bạn không có quyền xóa đơn thuốc này.', 403));
     }
 
     // Tìm và xóa tất cả các thuốc + lịch uống liên quan đến đơn thuốc này

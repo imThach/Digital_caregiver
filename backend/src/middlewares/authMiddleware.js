@@ -23,6 +23,10 @@ export const protect = catchAsync(async (req, res, next) => {
         return next(new AppError('Tài khoản sở hữu token này không còn tồn tại.', 401));
     }
 
+    if (decoded.tokenVersion !== undefined && decoded.tokenVersion !== currentUser.tokenVersion) {
+        return next(new AppError('Phiên đăng nhập đã bị thu hồi. Vui lòng đăng nhập lại.', 401));
+    }
+
     if (!currentUser.isActive) {
         return next(new AppError('Tài khoản của bạn đã bị khóa hoặc ngừng hoạt động.', 403));
     }

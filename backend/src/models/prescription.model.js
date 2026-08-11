@@ -32,17 +32,14 @@ const prescriptionSchema = new Schema(
             index: true,
         },
         confirmedAt: Date,
-        createdAt: {
-            type: Date,
-            default: Date.now,
-            expires: 30 * 24 * 60 * 60, // Tự động xóa đơn thuốc sau 30 ngày (2,592,000 giây)
-        },
     },
     {
         collection: "prescriptions",
+        timestamps: true,
     },
 );
 
+prescriptionSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 prescriptionSchema.index({ elderlyId: 1, createdAt: -1 });
 
 export default models.Prescription || model("Prescription", prescriptionSchema);

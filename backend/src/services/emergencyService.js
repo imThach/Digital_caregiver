@@ -1,23 +1,40 @@
 import { EmergencyEvent, CaregiverLink, User } from '../models/index.js';
 import AppError from '../utils/appError.js';
-import nodemailer from 'nodemailer';
+import { transporter } from './emailService.js';
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
+export const triggerSosService = async (elderlyId, triggeredBy, latitude, longitude, callingUser = null) => {
+    let targetElderlyId = elderlyId;
 
-export const triggerSosService = async (elderlyId, triggeredBy, latitude, longitude) => {
+    if (callingUser) {
+        if (callingUser.role === 'elderly') {
+            // Elderly user chỉ được gửi SOS cho chính bản thân mình
+            targetElderlyId = callingUser._id;
+        } else if (callingUser.role === 'caregiver') {
+            if (!elderlyId) {
+                throw new AppError('Vui lòng cung cấp elderlyId.', 400);
+            }
+            const isLinked = await CaregiverLink.exists({
+                caregiverId: callingUser._id,
+                elderlyId,
+                status: 'active',
+            });
+            if (!isLinked) {
+                throw new AppError('Bạn không có quyền kích hoạt tín hiệu khẩn cấp cho người cao tuổi này.', 403);
+            }
+        }
+    }
+
+    if (!targetElderlyId) {
+        throw new AppError('Vui lòng cung cấp elderlyId.', 400);
+    }
+
     let mapsLink = null;
     if (latitude && longitude) {
         mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
     }
 
     const event = await EmergencyEvent.create({
-        elderlyId,
+        elderlyId: targetElderlyId,
         triggeredBy: triggeredBy || 'button',
         latitude,
         longitude,
@@ -25,7 +42,7 @@ export const triggerSosService = async (elderlyId, triggeredBy, latitude, longit
         status: 'active',
     });
 
-    const link = await CaregiverLink.findOne({ elderlyId, status: 'active' }).populate('caregiverId elderlyId');
+    const link = await CaregiverLink.findOne({ elderlyId: targetElderlyId, status: 'active' }).populate('caregiverId elderlyId');
 
     if (link && link.caregiverId && link.caregiverId.email) {
         const caregiverEmail = link.caregiverId.email;

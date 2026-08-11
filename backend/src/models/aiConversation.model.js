@@ -10,11 +10,14 @@ const aiConversationSchema = new Schema(
             required: true,
             index: true,
         },
-        questionText: {
+        userMessage: {
             type: String,
             required: true,
         },
-        answerText: String,
+        aiReply: {
+            type: String,
+            required: true,
+        },
     },
     {
         collection: "ai_conversations",

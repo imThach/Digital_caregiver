@@ -1,20 +1,22 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import * as pairingController from '../controllers/pairingController.js';
 import { protect, restrictTo } from '../middlewares/authMiddleware.js';
-import multer from 'multer';
-import AppError from '../utils/appError.js';
+import { upload } from '../middlewares/uploadMiddleware.js';
 
 const router = express.Router();
-const upload = multer({
-    storage: multer.memoryStorage(),
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-            return;
-        }
-        cb(new AppError('Chỉ chấp nhận tập tin hình ảnh.', 400), false);
+
+// Rate limiter cho route /connect (không yêu cầu auth)
+// Mã pairing chỉ có 900.000 khả năng → cần chặn brute-force
+const connectRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 phút
+    max: 5,                    // Tối đa 5 lần thử mỗi IP
+    message: {
+        status: 'fail',
+        message: 'Quá nhiều lần thử kết nối. Vui lòng đợi 15 phút rồi thử lại.',
     },
-    limits: { fileSize: 10 * 1024 * 1024 },
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 
 /**
@@ -47,8 +49,12 @@ const upload = multer({
  *     responses:
  *       200:
  *         description: Kết nối thiết bị thành công, trả về JWT Token của thiết bị
+ *       400:
+ *         description: Mã kết nối không chính xác hoặc đã hết hạn
+ *       429:
+ *         description: Quá nhiều lần thử, bị giới hạn tốc độ
  */
-router.post('/connect', pairingController.connectDevice);
+router.post('/connect', connectRateLimiter, pairingController.connectDevice);
 
 router.use(protect);
 
@@ -63,6 +69,10 @@ router.use(protect);
  *     responses:
  *       200:
  *         description: Trả về mã pairingCode 6 chữ số
+ *       401:
+ *         description: Chưa xác thực
+ *       403:
+ *         description: Không có quyền truy cập
  */
 router.post('/generate', restrictTo('caregiver'), pairingController.generateCode);
 
@@ -76,11 +86,78 @@ router.post('/generate', restrictTo('caregiver'), pairingController.generateCode
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Trả về danh sách người cao tuổi
+ *         description: Trả về danh sách người cao tuổi đã liên kết thành công
+ *       401:
+ *         description: Chưa xác thực
+ *       403:
+ *         description: Không có quyền truy cập
  */
 router.get('/my-elderly', restrictTo('caregiver'), pairingController.getMyElderly);
 
+/**
+ * @swagger
+ * /api/v1/pairing/family-profile:
+ *   get:
+ *     summary: Caregiver lấy thông tin hồ sơ gia đình và trạng thái hoàn thiện
+ *     tags: [Pairing]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Trả về thông tin Caregiver, Elderly liên kết và danh sách các trường chưa điền (missingFields)
+ *       401:
+ *         description: Chưa xác thực
+ *       403:
+ *         description: Không có quyền truy cập
+ */
 router.get('/family-profile', restrictTo('caregiver'), pairingController.getFamilyProfile);
+
+/**
+ * @swagger
+ * /api/v1/pairing/family-profile:
+ *   patch:
+ *     summary: Caregiver cập nhật hồ sơ gia đình (thông tin bản thân, người cao tuổi & ảnh đại diện)
+ *     tags: [Pairing]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               caregiverFullName:
+ *                 type: string
+ *               caregiverPhone:
+ *                 type: string
+ *               elderlyFullName:
+ *                 type: string
+ *               elderlyNickname:
+ *                 type: string
+ *               emergencyPhone:
+ *                 type: string
+ *               relationship:
+ *                 type: string
+ *               dateOfBirth:
+ *                 type: string
+ *                 format: date
+ *               caregiverAvatar:
+ *                 type: string
+ *                 format: binary
+ *               elderlyAvatar:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Đã cập nhật hồ sơ gia đình thành công
+ *       400:
+ *         description: Dữ liệu nhập vào không hợp lệ
+ *       401:
+ *         description: Chưa xác thực
+ *       403:
+ *         description: Không có quyền truy cập
+ */
 router.patch(
     '/family-profile',
     restrictTo('caregiver'),
@@ -111,13 +188,26 @@ router.patch(
  *                 type: string
  *               nickname:
  *                 type: string
+ *               fullName:
+ *                 type: string
  *               emergencyPhone:
+ *                 type: string
+ *               relationship:
  *                 type: string
  *               dateOfBirth:
  *                 type: string
+ *                 format: date
  *     responses:
  *       200:
- *         description: Đã cập nhật hồ sơ thành công
+ *         description: Đã cập nhật hồ sơ người cao tuổi thành công
+ *       400:
+ *         description: Dữ liệu không hợp lệ
+ *       401:
+ *         description: Chưa xác thực
+ *       403:
+ *         description: Không có quyền truy cập
+ *       404:
+ *         description: Không tìm thấy liên kết với người cao tuổi
  */
 router.patch('/elderly-profile', restrictTo('caregiver'), pairingController.updateElderlyProfile);
 

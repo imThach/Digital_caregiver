@@ -3,10 +3,11 @@ import { User, Otp } from '../models/index.js';
 import AppError from '../utils/appError.js';
 import { sendOtpEmail } from './emailService.js';
 
-const signToken = (id, role) => {
-    // Thiết bị người cao tuổi sử dụng token vĩnh viễn (10 năm) để không bao giờ bắt nhập lại mã OTP
-    const expiresIn = role === 'elderly' ? '3650d' : (process.env.JWT_EXPIRES_IN || '30d');
-    return jwt.sign({ id, role }, process.env.JWT_SECRET, {
+export const signToken = (id, role, tokenVersion = 0) => {
+    const expiresIn = role === 'elderly'
+        ? (process.env.JWT_EXPIRES_IN_ELDERLY || '90d')
+        : (process.env.JWT_EXPIRES_IN || '30d');
+    return jwt.sign({ id, role, tokenVersion }, process.env.JWT_SECRET, {
         expiresIn,
     });
 };
@@ -85,7 +86,7 @@ export const loginOrRegisterGoogleUser = async (code) => {
         }
     }
 
-    const token = signToken(user._id, user.role);
+    const token = signToken(user._id, user.role, user.tokenVersion);
 
     return {
         token,
@@ -154,7 +155,7 @@ export const verifyOtpAndLogin = async (email, otp) => {
         isNewUser = true;
     }
 
-    const token = signToken(user._id, user.role);
+    const token = signToken(user._id, user.role, user.tokenVersion);
 
     return {
         token,

@@ -1,23 +1,47 @@
 import { Medication, MedicationSchedule, MedicationLog, CaregiverLink, User } from '../models/index.js';
 import AppError from '../utils/appError.js';
-import { sendOtpEmail } from './emailService.js';
-import nodemailer from 'nodemailer';
+import { transporter } from './emailService.js';
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
+const getVietnamDateParts = (date = new Date()) => {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    });
+
+    const parts = {};
+    formatter.formatToParts(date).forEach(({ type, value }) => {
+        parts[type] = value;
+    });
+
+    return {
+        year: parseInt(parts.year, 10),
+        month: parseInt(parts.month, 10) - 1,
+        day: parseInt(parts.day, 10),
+        hours: parseInt(parts.hour, 10),
+        minutes: parseInt(parts.minute, 10),
+        seconds: parseInt(parts.second, 10),
+    };
+};
+
+const getVietnamStartOfDay = (date = new Date()) => {
+    const vn = getVietnamDateParts(date);
+    return new Date(Date.UTC(vn.year, vn.month, vn.day, -7, 0, 0, 0));
+};
+
+const getVietnamEndOfDay = (date = new Date()) => {
+    const vn = getVietnamDateParts(date);
+    return new Date(Date.UTC(vn.year, vn.month, vn.day, 16, 59, 59, 999));
+};
 
 export const getTodaySchedulesService = async (elderlyId) => {
-    // Xác định đầu ngày và cuối ngày theo giờ địa phương
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    const startOfDay = getVietnamStartOfDay();
+    const endOfDay = getVietnamEndOfDay();
 
     // Chỉ lấy các thuốc active đã đến ngày bắt đầu (startDate <= endOfDay)
     const activeMedications = await Medication.find({
@@ -76,8 +100,7 @@ export const logMedicationStatusService = async (elderlyId, scheduleId, status, 
         throw new AppError('Không tìm thấy lịch uống thuốc này.', 404);
     }
 
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = getVietnamStartOfDay();
 
     let log = await MedicationLog.findOne({
         scheduleId,
@@ -111,11 +134,10 @@ export const logMedicationStatusService = async (elderlyId, scheduleId, status, 
                 med.remainingQuantity = newRemaining;
 
                 if (newRemaining <= 0) {
-                    console.log(`[Medication Auto-Delete] Thuốc "${med.name}" của elderly ${elderlyId} đã hết (0 viên remaining). Tự động XÓA KHỎI DATABASE để tối ưu dung lượng.`);
-                    // 1. Xóa vĩnh viễn tất cả lịch uống thuốc liên quan khỏi DB
-                    await MedicationSchedule.deleteMany({ medicationId: med._id });
-                    // 2. Xóa vĩnh viễn thuốc khỏi DB
-                    await Medication.findByIdAndDelete(med._id);
+                    console.log(`[Medication Auto-Deactivate] Thuốc "${med.name}" của elderly ${elderlyId} đã hết (0 viên remaining). Chuyển isActive = false.`);
+                    med.isActive = false;
+                    await med.save();
+                    await MedicationSchedule.updateMany({ medicationId: med._id }, { isActive: false });
                 } else {
                     await med.save();
                 }
@@ -168,6 +190,8 @@ export const checkOverdueMedicationsAndNotify = async () => {
     const links = await CaregiverLink.find({ status: 'active' }).populate('caregiverId elderlyId');
 
     const now = new Date();
+    const vnNow = getVietnamDateParts(now);
+    const currentVnMinutes = vnNow.hours * 60 + vnNow.minutes;
 
     for (const link of links) {
         const caregiver = link.caregiverId;
@@ -180,32 +204,34 @@ export const checkOverdueMedicationsAndNotify = async () => {
             if (sch.status === 'taken') continue;
 
             const [hours, minutes] = sch.timeOfDay.split(':').map(Number);
-            const scheduledTime = new Date();
-            scheduledTime.setHours(hours, minutes, 0, 0);
+            const scheduledMinutes = hours * 60 + minutes;
 
-            // Bỏ qua phát thông báo quá hạn cho mốc giờ trôi qua trước thời điểm tạo đơn thuốc hôm nay
+            // Bỏ qua phát thông báo quá hạn cho mốc giờ trôi qua trước thời điểm tạo đơn thuốc hôm nay (theo giờ VN)
             if (sch.medicationId) {
                 const med = await Medication.findById(sch.medicationId);
                 if (med && med.createdAt) {
-                    const createdDate = new Date(med.createdAt);
-                    if (createdDate.toDateString() === now.toDateString() && scheduledTime.getTime() < createdDate.getTime()) {
-                        continue;
+                    const medVn = getVietnamDateParts(new Date(med.createdAt));
+                    if (medVn.year === vnNow.year && medVn.month === vnNow.month && medVn.day === vnNow.day) {
+                        const createdMinutes = medVn.hours * 60 + medVn.minutes;
+                        if (scheduledMinutes < createdMinutes) {
+                            continue;
+                        }
                     }
                 }
             }
 
-            // Kiểm tra nếu đã quá 30 phút so với giờ hẹn
-            const diffMinutes = (now.getTime() - scheduledTime.getTime()) / (1000 * 60);
+            // Kiểm tra nếu đã quá 30 phút so với giờ hẹn (tính theo giờ VN)
+            const diffMinutes = currentVnMinutes - scheduledMinutes;
 
             if (diffMinutes >= 30) {
-                // Kiểm tra xem đã gửi mail chưa
-                const startOfDay = new Date();
-                startOfDay.setHours(0, 0, 0, 0);
+                const startOfDay = getVietnamStartOfDay(now);
 
                 let log = await MedicationLog.findOne({
                     scheduleId: sch.scheduleId,
                     scheduledAt: { $gte: startOfDay },
                 });
+
+                const scheduledTime = new Date(Date.UTC(vnNow.year, vnNow.month, vnNow.day, hours - 7, minutes, 0, 0));
 
                 if (!log) {
                     log = await MedicationLog.create({

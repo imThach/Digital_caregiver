@@ -48,6 +48,10 @@ const userSchema = new Schema(
             default: true,
             index: true,
         },
+        tokenVersion: {
+            type: Number,
+            default: 0,
+        },
     },
     {
         collection: "users",

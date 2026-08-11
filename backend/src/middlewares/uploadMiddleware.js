@@ -11,8 +11,12 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-export const uploadSingleImage = multer({
+/** Instance multer dùng chung — gọi .single(), .fields(), .array() tuỳ route */
+export const upload = multer({
     storage,
     fileFilter,
     limits: { fileSize: 10 * 1024 * 1024 },
-}).single('image');
+});
+
+/** Shorthand cho route upload một ảnh duy nhất với field name "image" */
+export const uploadSingleImage = upload.single('image');

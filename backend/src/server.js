@@ -7,6 +7,7 @@ import {
     connectDatabase,
     disconnectDatabase,
 } from "./configs/database.js";
+import { User } from "./models/index.js";
 import { checkOverdueMedicationsAndNotify } from "./services/medicationService.js";
 
 const PORT = process.env.PORT || 3001;
@@ -31,13 +32,20 @@ async function startServer() {
         app.set("io", io);
 
         // Middleware xác thực Token cho Socket.IO
-        io.use((socket, next) => {
+        io.use(async (socket, next) => {
             const token = socket.handshake.auth?.token;
             if (!token) {
                 return next(new Error("Authentication error: Token missing"));
             }
             try {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const user = await User.findById(decoded.id);
+                if (!user || !user.isActive) {
+                    return next(new Error("Authentication error: User not found or inactive"));
+                }
+                if (decoded.tokenVersion !== undefined && decoded.tokenVersion !== user.tokenVersion) {
+                    return next(new Error("Authentication error: Token revoked"));
+                }
                 socket.user = decoded;
                 next();
             } catch (err) {

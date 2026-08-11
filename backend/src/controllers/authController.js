@@ -51,10 +51,6 @@ export const handleGoogleCallback = catchAsync(async (req, res, next) => {
 export const sendOtp = catchAsync(async (req, res, next) => {
     const { email } = req.body;
 
-    if (!email) {
-        return next(new AppError('Vui lòng nhập địa chỉ email.', 400));
-    }
-
     const { userExists } = await authService.generateAndSendOtp(email);
 
     res.status(200).json({
