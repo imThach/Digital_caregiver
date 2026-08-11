@@ -47,6 +47,10 @@ export function ElderlyProfile() {
     const [isGeneratingCode, setIsGeneratingCode] = useState(false);
     const [codeSuccessMsg, setCodeSuccessMsg] = useState('');
 
+    // Relogin Code Generator State
+    const [reloginCode, setReloginCode] = useState(null);
+    const [isGeneratingReloginCode, setIsGeneratingReloginCode] = useState(false);
+
     // Status Messages
     const [isLoading, setIsLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState('');
@@ -138,25 +142,30 @@ export function ElderlyProfile() {
     };
 
     // Handle Pairing Code Generation
-    const handleGeneratePairingCode = async () => {
-        setIsGeneratingCode(true);
+    // Handle Relogin Code Generation
+    const handleGenerateReloginCode = async () => {
+        if (!selectedElderlyId) {
+            setErrorMessage('Vui lòng hoàn tất và lưu hồ sơ người cao tuổi trước khi tạo mã đăng nhập lại.');
+            return;
+        }
+        setIsGeneratingReloginCode(true);
         setCodeSuccessMsg('');
         setErrorMessage('');
         try {
-            const res = await pairingApi.generateCode();
-            if (res.data?.pairingCode) {
-                setGeneratedCode(res.data.pairingCode);
-                setCodeSuccessMsg('Mã kết nối 6 chữ số đã được tạo! Nhập mã này trên màn hình kết nối của thiết bị Người cao tuổi.');
+            const res = await pairingApi.generateReloginCode(selectedElderlyId);
+            if (res.data?.data?.reloginCode) {
+                setReloginCode(res.data.data.reloginCode);
+                setCodeSuccessMsg('Mã đăng nhập lại đã được tạo! Mã này có hiệu lực trong 1 giờ để đăng nhập thiết bị mới.');
             } else {
-                setGeneratedCode(null);
-                setErrorMessage('Không thể tạo mã kết nối. Vui lòng thử lại sau.');
+                setReloginCode(null);
+                setErrorMessage('Không thể tạo mã đăng nhập lại. Vui lòng thử lại sau.');
             }
         } catch (err) {
-            console.error('Lỗi khi tạo mã kết nối:', err);
-            setGeneratedCode(null);
-            setErrorMessage(err.response?.data?.message || err.message || 'Không thể tạo mã kết nối. Vui lòng thử lại sau.');
+            console.error('Lỗi khi tạo mã đăng nhập lại:', err);
+            setReloginCode(null);
+            setErrorMessage(err.response?.data?.message || err.message || 'Không thể tạo mã đăng nhập lại. Vui lòng thử lại sau.');
         } finally {
-            setIsGeneratingCode(false);
+            setIsGeneratingReloginCode(false);
         }
     };
 
@@ -317,31 +326,26 @@ export function ElderlyProfile() {
                             <p className="m-0 text-xs text-[#424754]">{user?.email || 'caregiver@example.com'}</p>
                         </div>
                     </div>
-
-                    <button
-                        className="flex items-center justify-center gap-2 rounded-xl bg-[#0058be] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#00479e] active:scale-95 cursor-pointer disabled:opacity-60"
-                        type="button"
-                        onClick={handleGeneratePairingCode}
-                        disabled={isGeneratingCode}
-                    >
-                        <span className="material-symbols-outlined text-[18px]">vpn_key</span>
-                        {isGeneratingCode ? 'Đang tạo mã...' : 'Tạo mã kết nối mới (6 chữ số)'}
-                    </button>
                 </div>
 
-                {codeSuccessMsg && (
-                    <div className="mb-4 rounded-xl border border-[#006c49]/30 bg-[#8df7c5]/20 p-4 text-sm font-bold text-[#006c49]">
-                        {codeSuccessMsg}
-                    </div>
-                )}
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="rounded-xl border border-[#c2c6d6]/40 bg-white p-4">
-                        <p className="m-0 text-xs font-bold uppercase tracking-wider text-[#737f90]">Mã kết nối (Pairing Code)</p>
-                        <p className="m-0 mt-1 font-mono text-2xl font-black text-[#0058be]">
-                            {generatedCode || '...'}
+                        <div className="flex justify-between items-start mb-2">
+                            <p className="m-0 text-xs font-bold uppercase tracking-wider text-[#737f90]">Đăng Nhập Lại Thiết Bị Khác</p>
+                            <button
+                                className="flex items-center justify-center gap-1 rounded bg-[#0058be] px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#00479e] active:scale-95 cursor-pointer disabled:opacity-60"
+                                type="button"
+                                onClick={handleGenerateReloginCode}
+                                disabled={isGeneratingReloginCode || !selectedElderlyId}
+                            >
+                                <span className="material-symbols-outlined text-[14px]">refresh</span>
+                                {isGeneratingReloginCode ? 'Đang tạo...' : 'Tạo Mã'}
+                            </button>
+                        </div>
+                        <p className="m-0 font-mono text-2xl font-black text-[#0058be]">
+                            {reloginCode || '------'}
                         </p>
-                        <p className="m-0 mt-1 text-[11px] text-[#424754]">Hiệu lực 24h để kết nối thiết bị Người cao tuổi</p>
+                        <p className="m-0 mt-1 text-[11px] text-[#424754]">Chỉ dùng để đăng nhập lại cho người cao tuổi này (Không tạo mới). Hiệu lực 1 giờ.</p>
                     </div>
 
                     <div className="rounded-xl border border-[#c2c6d6]/40 bg-white p-4">

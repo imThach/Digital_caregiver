@@ -211,4 +211,37 @@ router.patch(
  */
 router.patch('/elderly-profile', restrictTo('caregiver'), pairingController.updateElderlyProfile);
 
+/**
+ * @swagger
+ * /api/v1/pairing/generate-relogin:
+ *   post:
+ *     summary: Caregiver tạo mã đăng nhập lại 6 chữ số (Hiệu lực 1h) cho elderly đã có
+ *     tags: [Pairing]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [elderlyId]
+ *             properties:
+ *               elderlyId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Trả về mã reloginCode 6 chữ số
+ *       400:
+ *         description: Thiếu elderlyId
+ *       401:
+ *         description: Chưa xác thực
+ *       403:
+ *         description: Không có quyền truy cập
+ *       404:
+ *         description: Không tìm thấy liên kết
+ * 
+ */
+router.post('/generate-relogin', restrictTo('caregiver'), pairingController.generateReloginCode);
+
 export default router;

@@ -18,8 +18,7 @@ Digital Caregiver là ứng dụng hỗ trợ người cao tuổi uống thuốc
 ### Backend
 
 - Node.js + Express.js
-- MongoDB + Mongoose
-- Redis + BullMQ
+- MongoDB + Mongooseư
 - Socket.IO
 - JWT + Google OAuth
 - Gemini API
@@ -70,7 +69,7 @@ Digital Caregiver là ứng dụng hỗ trợ người cao tuổi uống thuốc
 - Kích hoạt bằng nút **SOS** hoặc câu lệnh **“Cứu tôi với”**.
 - Ứng dụng lấy vị trí hiện tại bằng Geolocation API.
 - Người thân nhận cảnh báo kèm liên kết Google Maps.
-- Cảnh báo được gửi qua Socket.IO, push notification và email.
+- Cảnh báo được gửi qua Socket.IO và email.
 
 ### Dashboard và báo cáo
 

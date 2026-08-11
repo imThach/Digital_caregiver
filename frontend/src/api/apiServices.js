@@ -13,6 +13,7 @@ export const authApi = {
 // 2. Pairing API
 export const pairingApi = {
     generateCode: () => axiosClient.post('/api/v1/pairing/generate'),
+    generateReloginCode: (elderlyId) => axiosClient.post('/api/v1/pairing/generate-relogin', { elderlyId }),
     connectDevice: (pairingCode, nickname) => axiosClient.post('/api/v1/pairing/connect', { pairingCode, nickname }),
     getMyElderly: () => axiosClient.get('/api/v1/pairing/my-elderly'),
     getFamilyProfile: () => axiosClient.get('/api/v1/pairing/family-profile'),

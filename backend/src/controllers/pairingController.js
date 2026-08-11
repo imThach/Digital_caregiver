@@ -80,3 +80,20 @@ export const updateElderlyProfile = catchAsync(async (req, res, next) => {
         data,
     });
 });
+
+export const generateReloginCode = catchAsync(async (req, res, next) => {
+    const { elderlyId } = req.body;
+
+    if (!elderlyId) {
+        return next(new AppError('Vui lòng cung cấp elderlyId.', 400));
+    }
+
+    const data = await pairingService.generateReloginCode(req.user._id, elderlyId);
+
+    res.status(200).json({
+        status: 'success',
+        message: 'Đã tạo mã đăng nhập lại thành công. Mã có hiệu lực trong 1 giờ.',
+        data,
+    });
+});
+

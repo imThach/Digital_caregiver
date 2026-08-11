@@ -42,7 +42,59 @@ export const generatePairingCode = async (caregiverId) => {
 export const connectDeviceWithCode = async (pairingCode, nickname, currentUser, io = null) => {
     const cleanCode = pairingCode.trim();
 
-    // Mã kết nối chỉ hợp lệ khi liên kết đang ở trạng thái pending
+    // Stage D: kiểm tra reloginCode trước — đăng nhập lại cho elderly đã tồn tại
+    const activeLink = await CaregiverLink.findOne({
+        reloginCode: cleanCode,
+        status: 'active',
+    });
+
+    if (activeLink) {
+        if (activeLink.reloginCodeExpiresAt && activeLink.reloginCodeExpiresAt < new Date()) {
+            throw new AppError('Mã đăng nhập lại đã hết hạn. Vui lòng yêu cầu mã mới từ Người thân.', 400);
+        }
+
+        const elderlyUser = await User.findById(activeLink.elderlyId);
+        if (!elderlyUser) {
+            throw new AppError('Không tìm thấy tài khoản người cao tuổi.', 404);
+        }
+
+        // Mã chỉ dùng 1 lần — xóa ngay sau khi xác thực thành công
+        activeLink.reloginCode = undefined;
+        activeLink.reloginCodeExpiresAt = undefined;
+        await activeLink.save();
+
+        const caregiverUser = await User.findById(activeLink.caregiverId);
+        const token = signToken(elderlyUser._id, 'elderly', elderlyUser.tokenVersion);
+
+        if (io) {
+            io.emit('pairing_success', {
+                caregiverId: String(activeLink.caregiverId),
+                elderlyId: String(elderlyUser._id),
+                caregiverName: caregiverUser?.fullName || 'Người thân',
+                elderlyName: elderlyUser.fullName || elderlyUser.nickname || 'Người cao tuổi',
+                linkedAt: activeLink.linkedAt,
+            });
+        }
+
+        return {
+            token,
+            elderly: {
+                id: elderlyUser._id,
+                fullName: elderlyUser.fullName,
+                nickname: elderlyUser.nickname,
+                role: elderlyUser.role,
+            },
+            caregiver: {
+                id: caregiverUser?._id,
+                fullName: caregiverUser?.fullName,
+                phone: caregiverUser?.phone,
+            },
+            caregiverId: activeLink.caregiverId,
+            emergencyPhone: activeLink.emergencyPhone,
+        };
+    }
+
+    // Stage A/B/C: tìm link pending — kết nối elderly mới hoặc tái kết nối
     const link = await CaregiverLink.findOne({
         pairingCode: cleanCode,
         status: 'pending',
@@ -110,6 +162,23 @@ export const connectDeviceWithCode = async (pairingCode, nickname, currentUser, 
         caregiverId: link.caregiverId,
         emergencyPhone: link.emergencyPhone,
     };
+};
+
+export const generateReloginCode = async (caregiverId, elderlyId) => {
+    const link = await CaregiverLink.findOne({ caregiverId, elderlyId, status: 'active' });
+    if (!link) {
+        throw new AppError('Không tìm thấy kết nối active với người cao tuổi này.', 404);
+    }
+
+    const reloginCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // Hiệu lực 1 tiếng — ngắn hạn vì chỉ dùng để đăng nhập lại
+    const reloginCodeExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    link.reloginCode = reloginCode;
+    link.reloginCodeExpiresAt = reloginCodeExpiresAt;
+    await link.save();
+
+    return { reloginCode, reloginCodeExpiresAt };
 };
 
 export const getLinkedElderlyList = async (caregiverId) => {

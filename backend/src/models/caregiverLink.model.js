@@ -23,6 +23,16 @@ const caregiverLinkSchema = new Schema(
             index: true,
         },
         pairingCodeExpiresAt: Date,
+
+        // Mã đăng nhập lại cho thiết bị mới (ngắn hạn, chỉ dùng 1 lần)
+        reloginCode: {
+            type: String,
+            minlength: 6,
+            maxlength: 6,
+            index: { sparse: true },
+        },
+        reloginCodeExpiresAt: Date,
+
         emergencyPhone: {
             type: String,
             trim: true,

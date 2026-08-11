@@ -171,15 +171,15 @@ export function CaregiverDashboard() {
             <div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#dce9ff] text-[#0058be] transition group-hover:bg-[#2170e4] group-hover:text-white">
               <Icon name="plus" className="h-8 w-8" />
             </div>
-            <h3 className="m-0 text-xl font-bold text-[#0b1c30]">Add Elderly</h3>
+            <h3 className="m-0 text-xl font-bold text-[#0b1c30]">Thêm Người Cao Tuổi</h3>
             <p className="mx-auto mt-1 mb-10 max-w-[220px] text-sm text-[#424754]">
-              Connect a new elderly family member using a Pairing Code
+              Tạo mã kết nối để thêm một <b>tài khoản người cao tuổi mới hoàn toàn</b> vào danh sách theo dõi.
             </p>
             <button
               className="mt-auto h-12 w-full rounded-lg bg-[#0058be] px-5 text-base font-semibold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
               type="button"
             >
-              Connect Elderly
+              Tạo mã thêm mới
             </button>
           </article>
         </div>
