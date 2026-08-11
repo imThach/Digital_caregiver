@@ -355,12 +355,6 @@ export function ElderlyProfile() {
                         </p>
                         <p className="m-0 mt-1 text-[11px] text-[#424754]">Nhập SĐT ở form bên dưới để cập nhật</p>
                     </div>
-
-                    <div className="rounded-xl border border-[#c2c6d6]/40 bg-white p-4">
-                        <p className="m-0 text-xs font-bold uppercase tracking-wider text-[#737f90]">Vai trò tài khoản</p>
-                        <p className="m-0 mt-1.5 text-sm font-bold text-[#006c49]">Primary Family Caregiver</p>
-                        <p className="m-0 mt-1 text-[11px] text-[#424754]">Quản lý thông tin &amp; nhận cảnh báo SOS</p>
-                    </div>
                 </div>
             </section>
 
