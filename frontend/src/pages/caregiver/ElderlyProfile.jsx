@@ -153,8 +153,8 @@ export function ElderlyProfile() {
         setErrorMessage('');
         try {
             const res = await pairingApi.generateReloginCode(selectedElderlyId);
-            if (res.data?.data?.reloginCode) {
-                setReloginCode(res.data.data.reloginCode);
+            if (res.data?.reloginCode) {
+                setReloginCode(res.data.reloginCode);
                 setCodeSuccessMsg('Mã đăng nhập lại đã được tạo! Mã này có hiệu lực trong 1 giờ để đăng nhập thiết bị mới.');
             } else {
                 setReloginCode(null);
