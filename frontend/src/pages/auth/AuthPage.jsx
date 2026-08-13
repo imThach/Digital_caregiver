@@ -152,6 +152,11 @@ function AuthPage() {
         }
 
         login({ ...elderlyUser, token })
+
+        // Re-fetch full user object from /auth/me to ensure _id is available
+        // (backend returns 'id' but the app expects '_id' from Mongoose)
+        await checkAuth()
+
         setSuccessMessage(`⚡ Kết nối tức thì thành công với người thân (${caregiverName})! Đang chuyển đến màn hình chăm sóc...`)
         setTimeout(() => navigate('/elderly-home'), 1200)
       }
