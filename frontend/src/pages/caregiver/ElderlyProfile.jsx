@@ -124,7 +124,9 @@ export function ElderlyProfile() {
 
     const isFieldMissing = (fieldName) => missingFields.includes(fieldName);
 
-    const handleElderlyPhotoChange = (e) => {
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+    const handleElderlyPhotoChange = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
@@ -139,6 +141,24 @@ export function ElderlyProfile() {
             setElderlyAvatarPreview(reader.result);
         };
         reader.readAsDataURL(file);
+
+        setIsUploadingAvatar(true);
+        setStatusMessage('');
+        setErrorMessage('');
+        try {
+            const formData = new FormData();
+            formData.append('elderlyAvatar', file);
+            if (selectedElderlyId) {
+                formData.append('elderlyId', selectedElderlyId);
+            }
+            await pairingApi.updateFamilyProfile(formData);
+            setStatusMessage('Đã cập nhật ảnh người cao tuổi thành công!');
+            await loadFamilyProfileData();
+        } catch (err) {
+            setErrorMessage(err.message || 'Cập nhật ảnh thất bại, vui lòng thử lại.');
+        } finally {
+            setIsUploadingAvatar(false);
+        }
     };
 
     // Handle Pairing Code Generation
@@ -219,6 +239,7 @@ export function ElderlyProfile() {
             formData.append('elderlyFullName', elderlyFullName.trim());
             formData.append('elderlyNickname', elderlyNickname.trim());
             formData.append('relationship', relationship);
+
             formData.append('dateOfBirth', dateOfBirth);
             formData.append('emergencyPhone', emergencyPhone.trim());
 
@@ -560,14 +581,15 @@ export function ElderlyProfile() {
                                 id="elderlyAvatarInput"
                                 className="hidden"
                                 onChange={handleElderlyPhotoChange}
+                                disabled={isUploadingAvatar}
                             />
 
                             <label
                                 htmlFor="elderlyAvatarInput"
-                                className="inline-flex items-center gap-2 rounded-xl bg-[#eff4ff] px-4 py-2.5 text-xs font-bold text-[#0058be] border border-[#0058be]/30 transition hover:bg-[#dce8ff] cursor-pointer"
+                                className={`inline-flex items-center gap-2 rounded-xl bg-[#eff4ff] px-4 py-2.5 text-xs font-bold text-[#0058be] border border-[#0058be]/30 transition hover:bg-[#dce8ff] cursor-pointer ${isUploadingAvatar ? 'opacity-60 pointer-events-none' : ''}`}
                             >
-                                <span className="material-symbols-outlined text-base">photo_camera</span>
-                                {elderlyAvatarPreview ? 'Thay đổi ảnh người cao tuổi' : 'Tải ảnh người cao tuổi'}
+                                <span className="material-symbols-outlined text-base">{isUploadingAvatar ? 'hourglass_top' : 'photo_camera'}</span>
+                                {isUploadingAvatar ? 'Đang tải ảnh lên...' : elderlyAvatarPreview ? 'Thay đổi ảnh người cao tuổi' : 'Tải ảnh người cao tuổi'}
                             </label>
 
                             <p className="mt-3 text-[11px] text-[#737f90]">
